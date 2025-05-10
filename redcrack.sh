@@ -11,26 +11,43 @@ NC='\033[0m' # Sin color
 
 echo -e "${CYAN}Ejecutando Script redcrack.sh${NC}"
 
-
-#----------------------------------------------------------------------------------------------
-
+# ----------------------------------------------------------------------------------------------
 # Verificación y descarga de la última versión de redcrack.sh
 
-echo -e "${CYAN}Verificando ultima version de Script disponible...${NC}"
+echo -e "${CYAN}Verificando última versión del script disponible...${NC}"
 REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/main/redcrack.sh"
-LOCAL_HASH=$(sha256sum "$0" | awk '{print $1}')
-REMOTE_HASH=$(wget -qO- "$REPO_URL" | sha256sum | awk '{print $1}')
 
+# 1️⃣ Depuración: Confirmar acceso a la URL
+echo -e "${YELLOW}Probando acceso al archivo remoto...${NC}"
+curl -Is "$REPO_URL" | head -n 1
+
+# 2️⃣ Calcular el hash del script local
+echo -e "${CYAN}Calculando hash local...${NC}"
+LOCAL_HASH=$(sha256sum "$0" | awk '{print $1}')
+echo "LOCAL_HASH: $LOCAL_HASH"
+
+# 3️⃣ Descargar contenido remoto y calcular su hash
+echo -e "${CYAN}Calculando hash remoto...${NC}"
+REMOTE_CONTENT=$(curl -s "$REPO_URL")
+REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
+echo "REMOTE_HASH: $REMOTE_HASH"
+
+# 4️⃣ Depuración: Verificar si el contenido remoto es válido
+if [[ -z "$REMOTE_CONTENT" ]]; then
+    echo -e "${RED}Error: No se pudo obtener el contenido del script remoto.${NC}"
+    exit 1
+fi
+
+# 5️⃣ Comparar versiones y actualizar si es necesario
 if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
     echo -e "${YELLOW}Se encontró una nueva versión de redcrack.sh. Descargando...${NC}"
-    wget -qO "$0" "$REPO_URL"
+    echo "$REMOTE_CONTENT" > "$0"  # Reemplazo seguro del archivo actual
     echo -e "${GREEN}Actualización completada. Reiniciando el script...${NC}"
-    exec bash "$0" # Reinicia el script automáticamente
+    exec bash "$0"  # Reinicia el script automáticamente
     exit 0
 else
     echo -e "${GREEN}Ya tienes la última versión de redcrack.sh.${NC}"
 fi
-
 
 #----------------------------------------------------------------------------------------------
 
