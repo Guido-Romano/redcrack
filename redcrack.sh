@@ -1,5 +1,6 @@
 #!/bin/bash
 
+VERSION="Alpha 0.0.1"
 set -e
 
 # Colores ANSI
@@ -11,9 +12,26 @@ NC='\033[0m'          # Restablecer color (Sin color)
 
 
 # ----------------------------------------------------------------------------------------------
+
+echo -e "${RED}"
+cat << "EOF"                                                                                  
+                                 88                                                  88         
+                                 88                                                  88         
+                                 88                                                  88         
+8b,dPPYba,   ,adPPYba,   ,adPPYb,88   ,adPPYba,  8b,dPPYba,  ,adPPYYba,   ,adPPYba,  88   ,d8   
+88P'   "Y8  a8P_____88  a8"    `Y88  a8"     ""  88P'   "Y8  ""     `Y8  a8"     ""  88 ,a8"    
+88          8PP"""""""  8b       88  8b          88          ,adPPPPP88  8b          8888[      
+88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
+88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
+                                                                                                
+EOF
+echo -e "${WHITE}  By apocca V$VERSION${NC}"
+
+# ----------------------------------------------------------------------------------------------
+
 # Verificación y descarga de la última versión de redcrack.sh
 
-echo -e "${CYAN}Verificando última versión del script disponible...${NC}"
+echo -e "Verificando última versión del script disponible..."
 REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/main/redcrack.sh"
 LOCAL_HASH=$(sha256sum "$0" | awk '{print $1}')
 REMOTE_CONTENT=$(curl -s "$REPO_URL")
@@ -28,31 +46,17 @@ fi
 
 # 5️⃣ Comparar versiones y actualizar si es necesario
 if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
-    echo -e "${YELLOW}Se encontró una nueva versión de redcrack.sh. Descargando...${NC}"
+    echo -e "Se encontró una nueva versión de redcrack.sh. Descargando..."
     echo "$REMOTE_CONTENT" > "$0"  # Reemplazo seguro del archivo actual
 
     exec bash "$0"  # Reinicia el script automáticamente
     exit 0
-else
-    echo -e "${NC}Ya tienes la última versión de redcrack.sh.${NC}"
 fi
 
-VERSION="Alpha 0.0.1"
-echo -e "${CYAN}Ejecutando Script redcrack.sh - Versión $VERSION ${NC}"
 
-echo -e "${RED}"
-cat << "EOF"                                                                                  
-                                 88                                                  88         
-                                 88                                                  88         
-                                 88                                                  88         
-8b,dPPYba,   ,adPPYba,   ,adPPYb,88   ,adPPYba,  8b,dPPYba,  ,adPPYYba,   ,adPPYba,  88   ,d8   
-88P'   "Y8  a8P_____88  a8"    `Y88  a8"     ""  88P'   "Y8  ""     `Y8  a8"     ""  88 ,a8"    
-88          8PP"""""""  8b       88  8b          88          ,adPPPPP88  8b          8888[      
-88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
-88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
-                                                                                                
-EOF
-echo -e "${WHITE}  By apocca${NC}"
+
+
+
 
 #----------------------------------------------------------------------------------------------
 
