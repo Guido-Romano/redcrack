@@ -2,12 +2,12 @@
 
 set -e
 
-# Colores
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m' # Sin color
+# Colores ANSI
+RED='\033[0;31m'       # Rojo
+YELLOW='\033[1;33m'    # Amarillo
+CYAN='\033[0;36m'      # Cian
+WHITE='\033[1;37m'     # Blanco brillante
+NC='\033[0m'          # Restablecer color (Sin color)
 
 
 # ----------------------------------------------------------------------------------------------
@@ -34,17 +34,14 @@ if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
     exec bash "$0"  # Reinicia el script automáticamente
     exit 0
 else
-    echo -e "${GREEN}Ya tienes la última versión de redcrack.sh.${NC}"
+    echo -e "${NC}Ya tienes la última versión de redcrack.sh.${NC}"
 fi
 
 VERSION="Alpha 0.0.1"
 echo -e "${CYAN}Ejecutando Script redcrack.sh - Versión $VERSION ${NC}"
 
-echo -e "${CYAN}"
-
-cat << "EOF"
-
-                                                                                                
+echo -e "${RED}"
+cat << "EOF"                                                                                  
                                  88                                                  88         
                                  88                                                  88         
                                  88                                                  88         
@@ -55,7 +52,7 @@ cat << "EOF"
 88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
                                                                                                 
 EOF
-echo -e "  By Apocca${NC}"
+echo -e "${WHITE}  By apocca${NC}"
 
 #----------------------------------------------------------------------------------------------
 
@@ -84,9 +81,9 @@ else
     if [[ "$LATEST_HASH" != "$OUI_HASH" && -n "$LATEST_HASH" ]]; then
         echo -e "${RED}El archivo 'oui.txt' está desactualizado. Descargando nueva versión...${NC}"
         wget "$OUI_URL" -O oui.txt
-        echo -e "${GREEN}Archivo 'oui.txt' actualizado correctamente.${NC}"
+        echo -e "${NC}Archivo 'oui.txt' actualizado correctamente.${NC}"
     else
-        echo -e "${GREEN}El archivo 'oui.txt' está actualizado.${NC}"
+        echo -e "${NC}El archivo 'oui.txt' está actualizado.${NC}"
     fi
 fi
 
@@ -117,7 +114,7 @@ else
     INTERFAZ_MONITOR="$INTERFAZ"
 fi
 
-echo -e "${GREEN}Interfaz en modo monitor: $INTERFAZ_MONITOR${NC}"
+echo -e "${NC}Interfaz en modo monitor: $INTERFAZ_MONITOR${NC}"
 
 rm -f captura*.*
 
@@ -157,7 +154,7 @@ done
 
 # 4) DETENER MODO MONITOR Y RESTABLECER CONEXIÓN
 sudo airmon-ng stop "$INTERFAZ_MONITOR"
-echo -e "${GREEN}Modo monitor detenido en $INTERFAZ_MONITOR${NC}"
+echo -e "${NC}Modo monitor detenido en $INTERFAZ_MONITOR${NC}"
 sudo service NetworkManager restart
 sudo dhclient "$INTERFAZ"
 echo -e "${CYAN}Conexión restablecida${NC}"
