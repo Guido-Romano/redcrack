@@ -9,9 +9,6 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # Sin color
 
-VERSION="Alpha 0.0.1"
-echo -e "${CYAN}Ejecutando Script redcrack.sh - Versión $VERSION ${NC}"
-
 
 # ----------------------------------------------------------------------------------------------
 # Verificación y descarga de la última versión de redcrack.sh
@@ -39,6 +36,26 @@ if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
 else
     echo -e "${GREEN}Ya tienes la última versión de redcrack.sh.${NC}"
 fi
+
+VERSION="Alpha 0.0.1"
+echo -e "${CYAN}Ejecutando Script redcrack.sh - Versión $VERSION ${NC}"
+
+echo -e "${CYAN}"
+
+cat << "EOF"
+
+                                                                                                
+                                 88                                                  88         
+                                 88                                                  88         
+                                 88                                                  88         
+8b,dPPYba,   ,adPPYba,   ,adPPYb,88   ,adPPYba,  8b,dPPYba,  ,adPPYYba,   ,adPPYba,  88   ,d8   
+88P'   "Y8  a8P_____88  a8"    `Y88  a8"     ""  88P'   "Y8  ""     `Y8  a8"     ""  88 ,a8"    
+88          8PP"""""""  8b       88  8b          88          ,adPPPPP88  8b          8888[      
+88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
+88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
+                                                                                                
+EOF
+echo -e "  By Apocca${NC}"
 
 #----------------------------------------------------------------------------------------------
 
