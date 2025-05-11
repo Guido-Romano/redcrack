@@ -9,7 +9,9 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m' # Sin color
 
-echo -e "${CYAN}Ejecutando Script redcrack.sh${NC}"
+VERSION="Alpha 0.0.1"
+echo -e "${CYAN}Ejecutando Script redcrack.sh - Versión $VERSION ${NC}"
+
 
 # ----------------------------------------------------------------------------------------------
 # Verificación y descarga de la última versión de redcrack.sh
