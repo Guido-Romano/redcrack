@@ -1,47 +1,44 @@
 #!/bin/bash
 
-VERSION="0.0.1"
+VERSION="0.0.2"
 set -e
 
-# Colores ANSI
-RED='\033[0;31m'       # Rojo
-YELLOW='\033[1;33m'    # Amarillo
-CYAN='\033[0;36m'      # Cian
-WHITE='\033[1;37m'     # Blanco brillante
-NC='\033[0m'          # Restablecer color (Sin color)
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+NC='\033[0m'
 
-
-# ----------------------------------------------------------------------------------------------
-
-# Verificación y descarga de la última versión de redcrack.sh
-
-echo -e "Comprobando última versión disponible..."
 REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/main/redcrack.sh"
-LOCAL_HASH=$(sha256sum "$0" | awk '{print $1}')
-REMOTE_CONTENT=$(curl -s "$REPO_URL")
-REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
+SCRIPT_PATH="$0"
 
+# --- Verificar nueva version ---
+echo -e "Comprobando última versión disponible..."
 
+LOCAL_HASH=$(sha256sum "$SCRIPT_PATH" | awk '{print $1}')
+REMOTE_CONTENT=$(curl -fsSL "$REPO_URL" || echo "")
 
 if [[ -z "$REMOTE_CONTENT" ]]; then
-    echo -e "${RED}Error: No se pudo obtener el contenido del script remoto.${NC}"
+    echo -e "${RED}Error: No se pudo obtener el contenido remoto.${NC}"
     exit 1
 fi
 
-# 5️⃣ Comparar versiones y actualizar si es necesario
-if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
-    echo -e "Se encontró una nueva versión de redcrack.sh. Descargando..."
-    echo "$REMOTE_CONTENT" > "$0"  # Reemplazo seguro del archivo actual
+REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
 
-    exec bash "$0"  # Reinicia el script automáticamente
+if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
+    echo -e "${YELLOW}Nueva versión disponible. Actualizando...${NC}"
+    TMP_SCRIPT="$(mktemp)"
+    echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
+    chmod +x "$TMP_SCRIPT"
+    echo -e "${CYAN}Reiniciando con nueva versión...${NC}"
+    exec bash "$TMP_SCRIPT"
     exit 0
 fi
 
-# ----------------------------------------------------------------------------------------------
-
+# --- Banner ---
 echo
 echo -e "${RED}"
-cat << "EOF"                                                                                  
+cat << "EOF"
                                  88                                                  88         
                                  88                                                  88         
                                  88                                                  88         
@@ -50,17 +47,11 @@ cat << "EOF"
 88          8PP"""""""  8b       88  8b          88          ,adPPPPP88  8b          8888[      
 88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
 88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
-                                                                                                
 EOF
+
 echo -e "${WHITE}  By apocca V$VERSION${NC}"
 
-
-
-
-#----------------------------------------------------------------------------------------------
-
-# Comprobacion y descarga de dependencias
-
+# --- Dependencias ---
 for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-terminal; do
     if ! command -v "$pkg" &> /dev/null; then
         echo -e "${YELLOW}Instalando dependencia: $pkg${NC}"
@@ -68,7 +59,7 @@ for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-termi
     fi
 done
 
-# Verificación y descarga oui.txt
+# --- Verificar oui.txt ---
 OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
 LATEST_HASH_URL="https://standards-oui.ieee.org/oui/oui.txt.sha256"
 
@@ -89,7 +80,6 @@ else
         echo -e "${NC}El archivo 'oui.txt' está actualizado.${NC}"
     fi
 fi
-
 
 #----------------------------------------------------------------------------------------------
 
