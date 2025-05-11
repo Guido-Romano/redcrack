@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.0.2"
+VERSION="0.1.2"
 set -e
 
 RED='\033[0;31m'
@@ -32,23 +32,6 @@ if [[ -n "$REMOTE_CONTENT" ]]; then
 else
     echo -e "${YELLOW}No se pudo verificar la última versión. Continuando con la versión actual...${NC}"
 fi
-
-# --- Banner ---
-echo
-echo -e "${RED}"
-cat << "EOF"
-                                 88                                                  88         
-                                 88                                                  88         
-                                 88                                                  88         
-8b,dPPYba,   ,adPPYba,   ,adPPYb,88   ,adPPYba,  8b,dPPYba,  ,adPPYYba,   ,adPPYba,  88   ,d8   
-88P'   "Y8  a8P_____88  a8"    `Y88  a8"     ""  88P'   "Y8  ""     `Y8  a8"     ""  88 ,a8"    
-88          8PP"""""""  8b       88  8b          88          ,adPPPPP88  8b          8888[      
-88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
-88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
-EOF
-
-echo -e "${WHITE}  By apocca V$VERSION${NC}"
-
 # --- Dependencias ---
 for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-terminal; do
     if ! command -v "$pkg" &> /dev/null; then
@@ -79,6 +62,21 @@ else
     fi
 fi
 
+# --- Banner ---
+echo
+echo -e "${RED}"
+cat << "EOF"
+                                 88                                                  88         
+                                 88                                                  88         
+                                 88                                                  88         
+8b,dPPYba,   ,adPPYba,   ,adPPYb,88   ,adPPYba,  8b,dPPYba,  ,adPPYYba,   ,adPPYba,  88   ,d8   
+88P'   "Y8  a8P_____88  a8"    `Y88  a8"     ""  88P'   "Y8  ""     `Y8  a8"     ""  88 ,a8"    
+88          8PP"""""""  8b       88  8b          88          ,adPPPPP88  8b          8888[      
+88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
+88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
+EOF
+
+echo -e "${WHITE}  By apocca v$VERSION${NC}"
 
 #----------------------------------------------------------------------------------------------
 
