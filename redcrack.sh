@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="Alpha 0.0.1"
+VERSION="0.0.1"
 set -e
 
 # Colores ANSI
