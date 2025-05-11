@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.0.2"
+VERSION="0.0.1"
 set -e
 
 RED='\033[0;31m'
@@ -18,21 +18,19 @@ echo -e "Comprobando última versión disponible..."
 LOCAL_HASH=$(sha256sum "$SCRIPT_PATH" | awk '{print $1}')
 REMOTE_CONTENT=$(curl -fsSL "$REPO_URL" || echo "")
 
-if [[ -z "$REMOTE_CONTENT" ]]; then
-    echo -e "${RED}Error: No se pudo obtener el contenido remoto.${NC}"
-    exit 1
-fi
-
-REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
-
-if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
-    echo -e "${YELLOW}Nueva versión disponible. Actualizando...${NC}"
-    TMP_SCRIPT="$(mktemp)"
-    echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
-    chmod +x "$TMP_SCRIPT"
-    echo -e "${CYAN}Reiniciando con nueva versión...${NC}"
-    exec bash "$TMP_SCRIPT"
-    exit 0
+if [[ -n "$REMOTE_CONTENT" ]]; then
+    REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
+    if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
+        echo -e "${YELLOW}Nueva versión disponible. Actualizando...${NC}"
+        TMP_SCRIPT="$(mktemp)"
+        echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
+        chmod +x "$TMP_SCRIPT"
+        echo -e "${CYAN}Reiniciando con nueva versión...${NC}"
+        exec bash "$TMP_SCRIPT"
+        exit 0
+    fi
+else
+    echo -e "${YELLOW}No se pudo verificar la última versión. Continuando con la versión actual...${NC}"
 fi
 
 # --- Banner ---
@@ -80,6 +78,7 @@ else
         echo -e "${NC}El archivo 'oui.txt' está actualizado.${NC}"
     fi
 fi
+
 
 #----------------------------------------------------------------------------------------------
 
