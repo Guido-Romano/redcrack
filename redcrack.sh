@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # --------------------
-# RedCrack - Apocca v0.1.2
+# RedCrack - Apocca v0.1.4
 # --------------------
 
-VERSION="0.1.2"
+VERSION="0.1.4"
 set -e
 
 # --- Colores terminal ---
@@ -25,10 +25,10 @@ REMOTE_CONTENT=$(curl -fsSL "$REPO_URL" || echo "")
 if [[ -n "$REMOTE_CONTENT" ]]; then
     REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
     if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
-        echo -e "${YELLOW}Detectada nueva versión disponible.${NC}"
+        echo -e "Detectada nueva versión disponible."
 
         # Preguntar al usuario si desea actualizar
-        echo -e "${CYAN}¿Quieres actualizar? (s/n): ${NC}"
+        echo -e "¿Quieres actualizar? (s/n):"
         read -r respuesta
 
         if [[ "$respuesta" =~ ^[sS]$ ]]; then
@@ -38,17 +38,17 @@ if [[ -n "$REMOTE_CONTENT" ]]; then
             exec bash "$TMP_SCRIPT"
             exit 0
         else
-            echo -e "${YELLOW}Continuando con la versión actual...${NC}"
+            echo -e "Continuando con la versión actual..."
         fi
     fi
 else
-    echo -e "${YELLOW}No se pudo verificar la última versión, corrobore su conexión a internet. Continuando con la versión actual...${NC}"
+    echo -e "No se pudo verificar la última versión, corrobore su conexión a internet. Continuando con la versión actual..."
 fi
 
 # --- Verificar e instalar dependencias ---
 for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-terminal; do
     if ! command -v "$pkg" &> /dev/null; then
-        echo -e "${YELLOW}Instalando dependencias...${NC}"
+        echo -e "Instalando dependencias..."
         sudo apt-get install -y "$pkg"
     fi
 done
@@ -68,6 +68,7 @@ else
 fi
 
 # --- Banner ---
+
 echo -e "\n${RED}"
 cat << "EOF"
                                  88                                                  88         
@@ -80,6 +81,7 @@ cat << "EOF"
 88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
 EOF
 
+echo
 echo -e "${WHITE}  By apocca v$VERSION${NC}"
 
 # --- Comprobación modo monitor ---
@@ -107,7 +109,7 @@ rm -f captura*.*
 airodump-ng "$INTERFAZ_MONITOR" --band abg --write captura --output-format netxml,csv &
 AIROD_PID=$!
 
-read -p "${RED}Presioná ENTER cuando quieras procesar los resultados...${NC}"
+read -p "Presioná ENTER cuando quieras procesar los resultados..."
 kill "$AIROD_PID"
 sleep 2
 
@@ -118,8 +120,8 @@ if [ ! -f captura-01.kismet.netxml ]; then
     exit 1
 fi
 
-# --- Mostrar redes detectadas ---
-echo -e "\n${CYAN}========== REDES DETECTADAS ==========\n${NC}"
+#========== REDES DETECTADAS ==========
+echo -e "\n${WHITE}========== REDES DETECTADAS ==========\n${NC}"
 printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "Red" "MAC (punto de acceso)" "Fabricante" "Intens." "Canal" "Encriptación"
 xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
   -v "SSID/essid" -o "|" \
@@ -133,9 +135,40 @@ xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
     printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "$essid" "$bssid" "$fabricante" "$signal" "$channel" "$enc"
 done
 
+
+#========== CLIENTES DETECTADOS ==========
+
+echo
+echo -e "${WHITE}========== CLIENTES DETECTADOS ==========${NC}"
+echo
+printf "%-17s %-11s %-36s %-11s %-17s %-20s\n" "MAC" "Conectividad" "Fabricante" "Intensidad" "Asociado a" "Red"
+
+xmlstarlet sel --skip-dtd -t -m "//wireless-network/wireless-client" \
+  -v "../BSSID" -o "|" \
+  -v "client-mac" -o "|" \
+  -v "@type" -o "|" \
+  -v "snr-info/last_signal_dbm" -n captura-01.kismet.netxml 2>/dev/null |
+while IFS='|' read -r bssid mac tipo intensidad; do
+    [[ -z "$mac" || "$mac" == "00:00:00:00:00:00" ]] && continue
+
+    fabricante=$(grep -i "$(echo $mac | cut -d':' -f1-3)" oui.txt | awk -F"\t" '{print $2}')
+    [ -z "$fabricante" ] && fabricante=$(xmlstarlet sel --skip-dtd -t -m "//wireless-client[client-mac='$mac']" -v "client-manuf" captura-01.kismet.netxml)
+    [ -z "$fabricante" ] && fabricante="Unknown"
+
+    essid=$(xmlstarlet sel --skip-dtd -t -m "//wireless-network[BSSID='$bssid']" -v "SSID/essid" captura-01.kismet.netxml)
+
+    COLOR_INT="${NC}"
+    [[ "$intensidad" -ge -50 ]] && COLOR_INT="${GREEN}"
+    [[ "$intensidad" -lt -50 && "$intensidad" -gt -70 ]] && COLOR_INT="${YELLOW}"
+    [[ "$intensidad" -le -70 ]] && COLOR_INT="${RED}"
+
+    printf "%-17s %-11s %-36s ${COLOR_INT}%-11s${NC} %-17s %-20s\n" "$mac" "$tipo" "$fabricante" "$intensidad" "$bssid" "$essid"
+done
+
+
 # --- Restablecer conexión ---
 sudo airmon-ng stop "$INTERFAZ_MONITOR"
-echo -e "${NC}Modo monitor detenido en $INTERFAZ_MONITOR${NC}"
+echo -e "Modo monitor detenido en $INTERFAZ_MONITOR"
 sudo service NetworkManager restart
 sudo dhclient "$INTERFAZ"
-echo -e "${CYAN}Conexión restablecida${NC}"
+echo -e "${YELLOW}Conexión restablecida${NC}"
