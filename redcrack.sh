@@ -22,28 +22,66 @@ echo -e "Comprobando última versión disponible..."
 LOCAL_HASH=$(sha256sum "$SCRIPT_PATH" | awk '{print $1}')
 REMOTE_CONTENT=$(curl -fsSL "$REPO_URL" || echo "")
 
-if [[ -n "$REMOTE_CONTENT" ]]; then
-    REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
-    if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
-        echo -e "Detectada nueva versión disponible."
 
-        # Preguntar al usuario si desea actualizar
-        echo -e "¿Quieres actualizar? (s/n):"
-        read -r respuesta
-
-        if [[ "$respuesta" =~ ^[sS]$ ]]; then
-            TMP_SCRIPT="$(mktemp)"
-            echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
-            chmod +x "$TMP_SCRIPT"
-            exec bash "$TMP_SCRIPT"
-            exit 0
-        else
-            echo -e "Continuando con la versión actual..."
+verificar_y_actualizar() {
+    if [[ -n "$REMOTE_CONTENT" ]]; then
+        REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
+        if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
+            echo -e "\e[33mDetectada nueva versión disponible.\e[0m"
+            
+            while true; do
+                read -r -p "¿Quieres actualizar? (s/n): " respuesta
+                
+                case "$respuesta" in
+                    [sS]|[sS][iI])
+                        # Crear script temporal con contenido remoto
+                        TMP_SCRIPT="$(mktemp)"
+                        echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
+                        chmod +x "$TMP_SCRIPT"
+                        
+                        # Registrar intento de actualización
+                        echo "Actualizando script desde versión remota..."
+                        
+                        # Ejecutar nuevo script
+                        exec bash "$TMP_SCRIPT"
+                        exit 0
+                        ;;
+                    [nN]|[nN][oO])
+                        echo -e "\e[34mContinuando con la versión actual...\e[0m"
+                        break
+                        ;;
+                    *)
+                        echo -e "\e[31mRespuesta inválida. Por favor, responda 's' o 'n'.\e[0m"
+                        ;;
+                esac
+            done
         fi
+    else
+        echo -e "\e[31mNo se pudo verificar la última versión, corrobore su conexión a internet. Continuando con la versión actual...\e[0m"
     fi
-else
-    echo -e "No se pudo verificar la última versión, corrobore su conexión a internet. Continuando con la versión actual..."
-fi
+}
+
+# Llamar a la función de verificación y actualización
+verificar_y_actualizar
+
+
+# --- Banner ---
+
+echo -e "\n${RED}"
+cat << "EOF"
+                                 88                                                  88         
+                                 88                                                  88         
+                                 88                                                  88         
+8b,dPPYba,   ,adPPYba,   ,adPPYb,88   ,adPPYba,  8b,dPPYba,  ,adPPYYba,   ,adPPYba,  88   ,d8   
+88P'   "Y8  a8P_____88  a8"    `Y88  a8"     ""  88P'   "Y8  ""     `Y8  a8"     ""  88 ,a8"    
+88          8PP"""""""  8b       88  8b          88          ,adPPPPP88  8b          8888[      
+88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
+88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
+EOF
+
+echo
+echo -e "${WHITE}  By apocca v$VERSION${NC}"
+
 
 # --- Verificar e instalar dependencias ---
 for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-terminal; do
@@ -67,22 +105,7 @@ else
     fi
 fi
 
-# --- Banner ---
 
-echo -e "\n${RED}"
-cat << "EOF"
-                                 88                                                  88         
-                                 88                                                  88         
-                                 88                                                  88         
-8b,dPPYba,   ,adPPYba,   ,adPPYb,88   ,adPPYba,  8b,dPPYba,  ,adPPYYba,   ,adPPYba,  88   ,d8   
-88P'   "Y8  a8P_____88  a8"    `Y88  a8"     ""  88P'   "Y8  ""     `Y8  a8"     ""  88 ,a8"    
-88          8PP"""""""  8b       88  8b          88          ,adPPPPP88  8b          8888[      
-88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
-88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
-EOF
-
-echo
-echo -e "${WHITE}  By apocca v$VERSION${NC}"
 
 # --- Comprobación modo monitor ---
 INTERFAZ=$(airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
