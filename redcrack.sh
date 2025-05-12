@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # --------------------
-# RedCrack - Apocca v0.1.3
+# RedCrack - Apocca v0.1.2
 # --------------------
 
-VERSION="0.1.3"
+VERSION="0.1.2"
 set -e
 
 # --- Colores terminal ---
@@ -35,9 +35,10 @@ if [[ -n "$REMOTE_CONTENT" ]]; then
             TMP_SCRIPT="$(mktemp)"
             echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
             chmod +x "$TMP_SCRIPT"
-            echo -e "${CYAN}Reiniciando con nueva versión...${NC}"
             exec bash "$TMP_SCRIPT"
             exit 0
+        else
+            echo -e "${YELLOW}Continuando con la versión actual...${NC}"
         fi
     fi
 else
@@ -47,7 +48,7 @@ fi
 # --- Verificar e instalar dependencias ---
 for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-terminal; do
     if ! command -v "$pkg" &> /dev/null; then
-        echo -e "${YELLOW}Instalando dependencia: $pkg${NC}"
+        echo -e "${YELLOW}Instalando dependencias...${NC}"
         sudo apt-get install -y "$pkg"
     fi
 done
