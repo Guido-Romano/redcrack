@@ -1,8 +1,13 @@
 #!/bin/bash
 
-VERSION="0.1.2"
+# --------------------
+# RedCrack - Apocca v0.1.3
+# --------------------
+
+VERSION="0.1.3"
 set -e
 
+# --- Colores terminal ---
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
@@ -12,27 +17,34 @@ NC='\033[0m'
 REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/main/redcrack.sh"
 SCRIPT_PATH="$0"
 
-# --- Verificar nueva version ---
+# --- Verificar nueva versión ---
 echo -e "Comprobando última versión disponible..."
-
 LOCAL_HASH=$(sha256sum "$SCRIPT_PATH" | awk '{print $1}')
 REMOTE_CONTENT=$(curl -fsSL "$REPO_URL" || echo "")
 
 if [[ -n "$REMOTE_CONTENT" ]]; then
     REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
     if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
-        echo -e "${YELLOW}Nueva versión disponible. Actualizando...${NC}"
-        TMP_SCRIPT="$(mktemp)"
-        echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
-        chmod +x "$TMP_SCRIPT"
-        echo -e "${CYAN}Reiniciando con nueva versión...${NC}"
-        exec bash "$TMP_SCRIPT"
-        exit 0
+        echo -e "${YELLOW}Detectada nueva versión disponible.${NC}"
+
+        # Preguntar al usuario si desea actualizar
+        echo -e "${CYAN}¿Quieres actualizar? (s/n): ${NC}"
+        read -r respuesta
+
+        if [[ "$respuesta" =~ ^[sS]$ ]]; then
+            TMP_SCRIPT="$(mktemp)"
+            echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
+            chmod +x "$TMP_SCRIPT"
+            echo -e "${CYAN}Reiniciando con nueva versión...${NC}"
+            exec bash "$TMP_SCRIPT"
+            exit 0
+        fi
     fi
 else
-    echo -e "${YELLOW}No se pudo verificar la última versión. Continuando con la versión actual...${NC}"
+    echo -e "${YELLOW}No se pudo verificar la última versión, corrobore su conexión a internet. Continuando con la versión actual...${NC}"
 fi
-# --- Dependencias ---
+
+# --- Verificar e instalar dependencias ---
 for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-terminal; do
     if ! command -v "$pkg" &> /dev/null; then
         echo -e "${YELLOW}Instalando dependencia: $pkg${NC}"
@@ -40,31 +52,22 @@ for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-termi
     fi
 done
 
-# --- Verificar oui.txt ---
+# --- Descarga oui.txt si no está o si hay nueva versión ---
 OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
 LATEST_HASH_URL="https://standards-oui.ieee.org/oui/oui.txt.sha256"
 
 if [ ! -f "oui.txt" ]; then
-    echo -e "${YELLOW}Descargando archivo 'oui.txt'...${NC}"
     wget "$OUI_URL" -O oui.txt
 else
-    echo -e "${CYAN}'oui.txt' ya existe. Verificando si está actualizado...${NC}"
-
     OUI_HASH="$(sha256sum oui.txt | awk '{print $1}')"
     LATEST_HASH="$(wget -qO- "$LATEST_HASH_URL" | awk '{print $1}' || echo "")"
-
     if [[ "$LATEST_HASH" != "$OUI_HASH" && -n "$LATEST_HASH" ]]; then
-        echo -e "${RED}El archivo 'oui.txt' está desactualizado. Descargando nueva versión...${NC}"
         wget "$OUI_URL" -O oui.txt
-        echo -e "${NC}Archivo 'oui.txt' actualizado correctamente.${NC}"
-    else
-        echo -e "${NC}El archivo 'oui.txt' está actualizado.${NC}"
     fi
 fi
 
 # --- Banner ---
-echo
-echo -e "${RED}"
+echo -e "\n${RED}"
 cat << "EOF"
                                  88                                                  88         
                                  88                                                  88         
@@ -78,24 +81,18 @@ EOF
 
 echo -e "${WHITE}  By apocca v$VERSION${NC}"
 
-#----------------------------------------------------------------------------------------------
-
-
-# Comprobacion de modo monitor
-
+# --- Comprobación modo monitor ---
 INTERFAZ=$(airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
-
 if [ -z "$INTERFAZ" ]; then
     echo -e "${RED}No se encontró ninguna interfaz inalámbrica.${NC}"
     exit 1
 fi
 
 if ! iwconfig "$INTERFAZ" 2>/dev/null | grep -q "Mode:Monitor"; then
-    echo -e "${YELLOW}La interfaz $INTERFAZ no está en modo monitor. Configurando...${NC}"
+    echo -e "${YELLOW}Cambiando interfaz a modo monitor${NC}"
     sudo airmon-ng check kill > /dev/null 2>&1
     sudo airmon-ng start "$INTERFAZ" > /dev/null
     INTERFAZ_MONITOR=$(iwconfig 2>/dev/null | awk '/Mode:Monitor/ {print $1}' | head -n1)
-    
     if [ -z "$INTERFAZ_MONITOR" ]; then
         echo -e "${RED}Fallo al activar modo monitor.${NC}"
         exit 1
@@ -104,32 +101,25 @@ else
     INTERFAZ_MONITOR="$INTERFAZ"
 fi
 
-echo -e "${NC}Interfaz en modo monitor: $INTERFAZ_MONITOR${NC}"
-
+# --- Captura ---
 rm -f captura*.*
-
-echo -e "${YELLOW}Abriendo airodump-ng en esta terminal...${NC}"
 airodump-ng "$INTERFAZ_MONITOR" --band abg --write captura --output-format netxml,csv &
 AIROD_PID=$!
 
-read -p "Presioná ENTER cuando quieras procesar los resultados..."
-
+read -p "${RED}Presioná ENTER cuando quieras procesar los resultados...${NC}"
 kill "$AIROD_PID"
 sleep 2
 
+# Limpiar DTD innecesario
 sed -i '/<!DOCTYPE.*kismet.*dtd">/d' captura-01.kismet.netxml
-
 if [ ! -f captura-01.kismet.netxml ]; then
     echo -e "${RED}Error: El archivo de captura no se generó correctamente.${NC}"
     exit 1
 fi
 
-
-#----------------------------------------------------------------------------------------------
-
-echo -e "\n${CYAN}========== REDES DETECTADAS ==========${NC}\n"
+# --- Mostrar redes detectadas ---
+echo -e "\n${CYAN}========== REDES DETECTADAS ==========\n${NC}"
 printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "Red" "MAC (punto de acceso)" "Fabricante" "Intens." "Canal" "Encriptación"
-
 xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
   -v "SSID/essid" -o "|" \
   -v "BSSID" -o "|" \
@@ -142,7 +132,7 @@ xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
     printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "$essid" "$bssid" "$fabricante" "$signal" "$channel" "$enc"
 done
 
-# 4) DETENER MODO MONITOR Y RESTABLECER CONEXIÓN
+# --- Restablecer conexión ---
 sudo airmon-ng stop "$INTERFAZ_MONITOR"
 echo -e "${NC}Modo monitor detenido en $INTERFAZ_MONITOR${NC}"
 sudo service NetworkManager restart
