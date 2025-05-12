@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # --------------------
-# RedCrack - Apocca v0.1.4
+# RedCrack - Apocca v0.1.5
 # --------------------
 
-VERSION="0.1.4"
+VERSION="0.1.5"
 set -e
 
 # --- Colores terminal ---
@@ -17,38 +17,32 @@ NC='\033[0m'
 REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/rama01/redcrack.sh"
 SCRIPT_PATH="$0"
 
-# --- Verificar nueva versión ---
-echo -e "Comprobando última versión disponible..."
-LOCAL_HASH=$(sha256sum "$SCRIPT_PATH" | awk '{print $1}')
-REMOTE_CONTENT=$(curl -fsSL "$REPO_URL" || echo "")
 
-
-verificar_y_actualizar() {
+# Verificar si hay una nueva versión disponible
+verificar_actualizacion() {
     if [[ -n "$REMOTE_CONTENT" ]]; then
         REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
+        
+        # Comparar hashes solo si son diferentes
         if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
-            echo -e "\e[33mDetectada nueva versión disponible.\e[0m"
+            echo -e "\e[33mSe ha detectado una nueva versión del software.\e[0m"
+            echo -e "\e[34mVersiones:\e[0m"
+            echo -e "  Versión actual: \e[32m$LOCAL_HASH\e[0m"
+            echo -e "  Versión nueva:  \e[36m$REMOTE_HASH\e[0m"
             
+            # Preguntar explícitamente antes de cualquier actualización
             while true; do
-                read -r -p "¿Quieres actualizar? (s/n): " respuesta
+                read -p "¿Desea actualizar el software? (s/n): " respuesta
                 
                 case "$respuesta" in
                     [sS]|[sS][iI])
-                        # Crear script temporal con contenido remoto
-                        TMP_SCRIPT="$(mktemp)"
-                        echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
-                        chmod +x "$TMP_SCRIPT"
-                        
-                        # Registrar intento de actualización
-                        echo "Actualizando script desde versión remota..."
-                        
-                        # Ejecutar nuevo script
-                        exec bash "$TMP_SCRIPT"
-                        exit 0
+                        echo "Iniciando proceso de actualización..."
+                        # Aquí solo PREPARAMOS la actualización, NO la ejecutamos automáticamente
+                        return 0  # Indica que el usuario quiere actualizar
                         ;;
                     [nN]|[nN][oO])
-                        echo -e "\e[34mContinuando con la versión actual...\e[0m"
-                        break
+                        echo "Actualización cancelada. Continuando con la versión actual."
+                        return 1  # Indica que el usuario NO quiere actualizar
                         ;;
                     *)
                         echo -e "\e[31mRespuesta inválida. Por favor, responda 's' o 'n'.\e[0m"
@@ -57,13 +51,42 @@ verificar_y_actualizar() {
             done
         fi
     else
-        echo -e "\e[31mNo se pudo verificar la última versión, corrobore su conexión a internet. Continuando con la versión actual...\e[0m"
+        echo -e "\e[31mNo se pudo verificar la última versión. Compruebe su conexión a internet.\e[0m"
+        return 1
+    fi
+    
+    # Si los hashes son iguales o no hay contenido remoto
+    return 1
+}
+
+# Función de actualización separada
+realizar_actualizacion() {
+    if [[ -n "$REMOTE_CONTENT" ]]; then
+        # Crear script temporal
+        TMP_SCRIPT="$(mktemp)"
+        echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
+        chmod +x "$TMP_SCRIPT"
+        
+        echo "Ejecutando nueva versión..."
+        # Cambiar al nuevo script
+        exec bash "$TMP_SCRIPT"
+        exit 0
+    else
+        echo "No hay contenido para actualizar."
+        exit 1
     fi
 }
 
-# Llamar a la función de verificación y actualización
-verificar_y_actualizar
 
+# verificar si hay actualización
+
+if verificar_actualizacion; then
+    # Si el usuario confirma, realizamos la actualización
+    read -p "Presione Enter para continuar con la actualización o Ctrl+C para cancelar..." 
+    realizar_actualizacion
+else
+    echo "No se requiere actualización."
+fi
 
 # --- Banner ---
 
@@ -84,6 +107,7 @@ echo -e "${WHITE}  By apocca v$VERSION${NC}"
 
 
 # --- Verificar e instalar dependencias ---
+
 for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-terminal; do
     if ! command -v "$pkg" &> /dev/null; then
         echo -e "Instalando dependencias..."
@@ -92,6 +116,7 @@ for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-termi
 done
 
 # --- Descarga oui.txt si no está o si hay nueva versión ---
+
 OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
 LATEST_HASH_URL="https://standards-oui.ieee.org/oui/oui.txt.sha256"
 
@@ -108,6 +133,7 @@ fi
 
 
 # --- Comprobación modo monitor ---
+
 INTERFAZ=$(airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
 if [ -z "$INTERFAZ" ]; then
     echo -e "${RED}No se encontró ninguna interfaz inalámbrica.${NC}"
@@ -143,7 +169,9 @@ if [ ! -f captura-01.kismet.netxml ]; then
     exit 1
 fi
 
+
 #========== REDES DETECTADAS ==========
+
 echo -e "\n${WHITE}========== REDES DETECTADAS ==========\n${NC}"
 printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "Red" "MAC (punto de acceso)" "Fabricante" "Intens." "Canal" "Encriptación"
 xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
@@ -189,7 +217,9 @@ while IFS='|' read -r bssid mac tipo intensidad; do
 done
 
 
+
 # --- Restablecer conexión ---
+
 sudo airmon-ng stop "$INTERFAZ_MONITOR"
 echo -e "Modo monitor detenido en $INTERFAZ_MONITOR"
 sudo service NetworkManager restart
