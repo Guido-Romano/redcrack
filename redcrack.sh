@@ -14,7 +14,7 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/main/redcrack.sh"
+REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/rama01/redcrack.sh"
 SCRIPT_PATH="$0"
 
 # --- Verificar nueva versión ---
