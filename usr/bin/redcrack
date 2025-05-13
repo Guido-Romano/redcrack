@@ -1,10 +1,9 @@
 #!/bin/bash
 set -e
 
+# ------------------------------------ VARIABLES GLOBALES ------------------------------------
 
-# ------------------------------------ COLORES Y VARIABLES ------------------------------------
-
-VERSION="0.3.7"
+readonly VERSION="0.3.7"
 
 # Colores
 RED='\033[0;31m'
@@ -13,91 +12,64 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-# Rutas de Script
-REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/rama01/redcrack.sh"
-LOCAL_PATH="/usr/bin/redcrack"
-TMP_PATH="/tmp/redcrack_latest"
+# URLs y rutas
+readonly REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/rama01/redcrack.sh"
+readonly INSTALL_PATH="/usr/bin/redcrack"
+readonly TMP_PATH="/tmp/redcrack_latest.sh"
 
-# Rutas del archivo OUI
-OUI_PATH="/usr/share/redcrack/oui.txt"
-TMP_OUI="/tmp/oui_latest.txt"
-OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
+readonly OUI_PATH="/usr/share/redcrack/oui.txt"
+readonly TMP_OUI="/tmp/oui_latest.txt"
+readonly OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
 
+# -------------------------------- COMPROBACION DE ACTUALIZACIONES DEL SCRIPT --------------------------------
 
-# -------------------------------- COMPROBACION DE ACTUALIZACIONES --------------------------------
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo -e "${CYAN}[RedCrack] Verificando actualizaciones del script...${NC}"
 
-# Comprobar si se está ejecutando como script principal o como actualización
-# Esto evita la recursión infinita
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then  # Solo ejecuta esta sección si el script no está siendo "importado"
+    current_hash=$(sha256sum "$0" | awk '{print $1}')
 
-    # Calcular el hash de la versión local (si existe)
-    local_hash=""
-    if [ -f "$LOCAL_PATH" ]; then
-        local_hash=$(sha256sum "$LOCAL_PATH" | awk '{print $1}')
-    else
-        echo -e "${YELLOW}[RedCrack] No se encontró la instalación local. Descargando la versión inicial...${NC}"
-        wget -q --timeout=5 "$REPO_URL" -O "$TMP_PATH"
-        sudo mkdir -p "$(dirname "$LOCAL_PATH")" # Asegurar que el directorio exista
-        sudo cp "$TMP_PATH" "$LOCAL_PATH"
-        sudo chmod +x "$LOCAL_PATH"
-        echo -e "${CYAN}[RedCrack] Descarga inicial completada.${NC}"
-        local_hash=$(sha256sum "$LOCAL_PATH" | awk '{print $1}') # Calcular el hash de la recién descargada
-    fi
+    if curl -fsSL "$REPO_URL" -o "$TMP_PATH"; then
+        remote_hash=$(sha256sum "$TMP_PATH" | awk '{print $1}')
 
-    # Obtener el contenido del archivo remoto y calcular su hash
-    remote_hash=$(wget -qO- "$REPO_URL" 2>/dev/null | sha256sum | awk '{print $1}')
+        if [[ "$current_hash" != "$remote_hash" ]]; then
+            echo -e "${YELLOW}[RedCrack] Se encontró una nueva versión disponible.${NC}"
+            read -p "$(echo -e "${YELLOW}[RedCrack] ¿Deseás actualizar e instalar la última versión? (s/N): ${NC}")" confirm
 
-    # Comparar hashes y preguntar si hay una nueva versión
-    if [[ "$remote_hash" != "$local_hash" ]]; then
-        echo -e "${YELLOW}[RedCrack] Se encontró una nueva versión disponible en el repositorio.${NC}"
-        read -p "${YELLOW}[RedCrack] ¿Deseas descargar e instalar la última versión? (s/N): ${NC}" actualizar
-
-        if [[ "$actualizar" == "s" || "$actualizar" == "S" ]]; then
-            echo -e "${YELLOW}[RedCrack] Descargando la última versión...${NC}"
-            wget -q --timeout=5 "$REPO_URL" -O "$TMP_PATH"
-            sudo cp "$TMP_PATH" "$LOCAL_PATH"
-            sudo chmod +x "$LOCAL_PATH"
-            echo -e "${CYAN}[RedCrack] Actualización completada.${NC}"
-            echo -e "${CYAN}[RedCrack] Ejecutando la versión actualizada...${NC}"
-            exec "$LOCAL_PATH"  # Ejecuta la nueva versión y termina este script
-            exit 0  # Por si falló exec
+            if [[ "$confirm" =~ ^[sS]$ ]]; then
+                sudo cp "$TMP_PATH" "$INSTALL_PATH"
+                sudo chmod +x "$INSTALL_PATH"
+                echo -e "${CYAN}[RedCrack] Actualización completada. Ejecutando nueva versión...${NC}"
+                exec "$INSTALL_PATH"
+            else
+                echo -e "${CYAN}[RedCrack] Actualización cancelada por el usuario.${NC}"
+            fi
         else
-            echo -e "${CYAN}[RedCrack] Actualización cancelada por el usuario.${NC}"
+            rm -f "$TMP_PATH"
+            echo -e "${CYAN}[RedCrack] Ya estás usando la última versión.${NC}"
         fi
     else
-        echo -e "${CYAN}[RedCrack] Ya tenés la última versión.${NC}"
+        echo -e "${RED}[RedCrack] No se pudo verificar actualizaciones.${NC}"
     fi
-
 fi
 
+# -------------------- VERIFICACION AUTOMÁTICA SILENCIOSA DEL ARCHIVO OUI --------------------
 
-# ------------ Verificacion archivo oui.txt (base de datos MAC de distintos fabricantes)------------
-
-# Calcular el hash del archivo OUI local (si existe)
 local_oui_hash=""
-if [ -f "$OUI_PATH" ]; then
+if [[ -f "$OUI_PATH" ]]; then
     local_oui_hash=$(sha256sum "$OUI_PATH" | awk '{print $1}')
-else
-    echo -e "${YELLOW}[RedCrack] No se encontró el archivo OUI local, descargando la versión inicial...${NC}"
-    wget -q --timeout=5 "$OUI_URL" -O "$TMP_OUI"
-    sudo mkdir -p "$(dirname "$OUI_PATH")" # Asegurar que el directorio exista
-    sudo mv "$TMP_OUI" "$OUI_PATH"
-    echo -e "${CYAN}[RedCrack] Archivo OUI descargado.${NC}"
-    local_oui_hash=$(sha256sum "$OUI_PATH" | awk '{print $1}') # Calcular el hash de la recién descargada
 fi
 
-# Obtener el contenido del archivo OUI remoto y calcular su hash
-remote_oui_hash=$(wget -qO- "$OUI_URL" 2>/dev/null | sha256sum | awk '{print $1}')
+if curl -fsSL "$OUI_URL" -o "$TMP_OUI"; then
+    remote_oui_hash=$(sha256sum "$TMP_OUI" | awk '{print $1}')
 
-# Comparar hashes y actualizar automáticamente si es necesario
-if [[ "$remote_oui_hash" != "$local_oui_hash" ]]; then
-    echo -e "${YELLOW}[RedCrack] Se encontró una nueva versión del archivo OUI, actualizando...${NC}"
-    wget -q --timeout=5 "$OUI_URL" -O "$TMP_OUI"
-    sudo mv "$TMP_OUI" "$OUI_PATH" -f # Forzar la sobreescritura si es necesario
-    echo -e "${CYAN}[RedCrack] Archivo OUI actualizado.${NC}"
-else
-    echo -e "${CYAN}[RedCrack] El archivo OUI está actualizado.${NC}"
+    if [[ "$remote_oui_hash" != "$local_oui_hash" ]]; then
+        sudo mkdir -p "$(dirname "$OUI_PATH")"
+        sudo mv "$TMP_OUI" "$OUI_PATH"
+    else
+        rm -f "$TMP_OUI"
+    fi
 fi
+
 
 # ------------------------------------------ BANNER ------------------------------------------
 
