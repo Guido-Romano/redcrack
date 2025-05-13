@@ -14,7 +14,15 @@ WHITE='\033[1;37m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-#
+# Rutas de Script
+REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/rama01/redcrack.sh"
+LOCAL_PATH="/usr/bin/redcrack"
+TMP_PATH="/tmp/redcrack_latest"
+
+# Rutas del archivo OUI
+OUI_PATH="/usr/share/redcrack/oui.txt"
+TMP_OUI="/tmp/oui_latest.txt"
+OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
 
 
 # ------------------------------------------ BANNER ------------------------------------------
@@ -103,9 +111,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then  # Solo ejecuta esta sección si el
     fi
 
 fi
-
-# ELIMINA LA SIGUIENTE LÍNEA - Es la que causa el problema de bucle infinito
-# bash "$LOCAL_PATH"
 
 
 # ------------ Verificacion archivo oui.txt (base de datos MAC de distintos fabricantes)------------
