@@ -1,42 +1,26 @@
 #!/bin/bash
-
-# --------------------
-# RedCrack - Apocca v0.1.5
-# --------------------
-
-VERSION="0.1.5"
 set -e
 
-# --- Colores terminal ---
+
+# ------------------------------------ COLORES Y VARIABLES ------------------------------------
+
+VERSION="0.3.0"
+
+# Colores
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
+GREEN='\033[0;32m'
 NC='\033[0m'
 
-REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/rama01/redcrack.sh"
-SCRIPT_PATH="$0"
-
-# --- Opción de ejecución remota ---
-if [[ "$1" == "--update" ]]; then
-    echo -e "${CYAN}Descargando la última versión desde GitHub...${NC}"
-    bash <(curl -s "$REPO_URL")
-    exit 0
-fi
-
-# --- Mensaje de actualización ---
-echo -e "${YELLOW}Si deseas ejecutar la última versión directamente desde GitHub, usa:${NC}"
-echo -e "${WHITE}bash <(curl -s $REPO_URL)${NC}"
-
-# --- Continuación del script ---
-echo -e "\n${CYAN}Ejecutando RedCrack v$VERSION...${NC}"
+#
 
 
+# ------------------------------------------ BANNER ------------------------------------------
 
-
-# --- Banner ---
-
-echo -e "\n${RED}"
+echo
+echo -e "${RED}"
 cat << "EOF"
                                  88                                                  88         
                                  88                                                  88         
@@ -47,50 +31,128 @@ cat << "EOF"
 88          "8b,   ,aa  "8a,   ,d88  "8a,   ,aa  88          88,    ,88  "8a,   ,aa  88`"Yba,   
 88           `"Ybbd8"'   `"8bbdP"Y8   `"Ybbd8"'  88          `"8bbdP"Y8   `"Ybbd8"'  88   `Y8a  
 EOF
-
 echo
-echo -e "${WHITE}  By apocca v$VERSION${NC}"
+echo -e "${WHITE}                                                              By apocca V$VERSION"
+echo
+echo
+echo "#############################################################################################"
+echo "#                                                                                           #"
+echo "#  IMPORTANTE: Herramienta para Pruebas de Penetración en Redes Wi-Fi                       #"
+echo "#                                                                                           #"
+echo "#  Este software ha sido desarrollado para realizar pruebas básicas de                      #"
+echo "#  penetración en redes inalámbricas que utilizan los protocolos WPA2 o                     #"
+echo "#  anteriores. Incorpora funcionalidades como la ejecución de Aircrack-ng,                  #"
+echo "#  la consulta del archivo OUI y la descarga automatizada de dependencias.                  #"
+echo "#                                                                                           #"
+echo "#  El uso de esta herramienta debe realizarse con absoluta responsabilidad y                #"
+echo "#  exclusivamente en redes propias o en entornos de laboratorio debidamente                 #"
+echo "#  autorizados. Queda terminantemente prohibido su uso sin el consentimiento                #"
+echo "#  explícito del propietario de la red.                                                     #"
+echo "#                                                                                           #"
+echo "#  El desarrollador no se hace responsable del uso indebido o ilegal que                    #"
+echo "#  pueda darse a esta herramienta. La responsabilidad recae completamente                   #"
+echo "#  en el usuario final.                                                                     #"
+echo "#                                                                                           #"
+echo "#############################################################################################"
+echo -e "${NC}"
+echo
 
 
-# --- Verificar e instalar dependencias ---
+# -------------------------------- COMPROBACION DE ACTUALIZACIONES --------------------------------
 
-for pkg in xmlstarlet wget aircrack-ng iw wireless-tools grep awk sed mate-terminal; do
-    if ! command -v "$pkg" &> /dev/null; then
-        echo -e "Instalando dependencias..."
-        sudo apt-get install -y "$pkg"
+# Comprobar si se está ejecutando como script principal o como actualización
+# Esto evita la recursión infinita
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then  # Solo ejecuta esta sección si el script no está siendo "importado"
+
+    # Calcular el hash de la versión local (si existe)
+    local_hash=""
+    if [ -f "$LOCAL_PATH" ]; then
+        local_hash=$(sha256sum "$LOCAL_PATH" | awk '{print $1}')
+    else
+        echo -e "${YELLOW}[RedCrack] No se encontró la instalación local. Descargando la versión inicial...${NC}"
+        wget -q --timeout=5 "$REPO_URL" -O "$TMP_PATH"
+        sudo mkdir -p "$(dirname "$LOCAL_PATH")" # Asegurar que el directorio exista
+        sudo cp "$TMP_PATH" "$LOCAL_PATH"
+        sudo chmod +x "$LOCAL_PATH"
+        echo -e "${CYAN}[RedCrack] Descarga inicial completada.${NC}"
+        local_hash=$(sha256sum "$LOCAL_PATH" | awk '{print $1}') # Calcular el hash de la recién descargada
     fi
-done
 
-# --- Descarga oui.txt si no está o si hay nueva versión ---
+    # Obtener el contenido del archivo remoto y calcular su hash
+    remote_hash=$(wget -qO- "$REPO_URL" 2>/dev/null | sha256sum | awk '{print $1}')
 
-OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
-LATEST_HASH_URL="https://standards-oui.ieee.org/oui/oui.txt.sha256"
+    # Comparar hashes y preguntar si hay una nueva versión
+    if [[ "$remote_hash" != "$local_hash" ]]; then
+        echo -e "${YELLOW}[RedCrack] Se encontró una nueva versión disponible en el repositorio.${NC}"
+        read -p "${YELLOW}[RedCrack] ¿Deseas descargar e instalar la última versión? (s/N): ${NC}" actualizar
 
-if [ ! -f "oui.txt" ]; then
-    wget "$OUI_URL" -O oui.txt
-else
-    OUI_HASH="$(sha256sum oui.txt | awk '{print $1}')"
-    LATEST_HASH="$(wget -qO- "$LATEST_HASH_URL" | awk '{print $1}' || echo "")"
-    if [[ "$LATEST_HASH" != "$OUI_HASH" && -n "$LATEST_HASH" ]]; then
-        wget "$OUI_URL" -O oui.txt
+        if [[ "$actualizar" == "s" || "$actualizar" == "S" ]]; then
+            echo -e "${YELLOW}[RedCrack] Descargando la última versión...${NC}"
+            wget -q --timeout=5 "$REPO_URL" -O "$TMP_PATH"
+            sudo cp "$TMP_PATH" "$LOCAL_PATH"
+            sudo chmod +x "$LOCAL_PATH"
+            echo -e "${CYAN}[RedCrack] Actualización completada.${NC}"
+            echo -e "${CYAN}[RedCrack] Ejecutando la versión actualizada...${NC}"
+            exec "$LOCAL_PATH"  # Ejecuta la nueva versión y termina este script
+            exit 0  # Por si falló exec
+        else
+            echo -e "${CYAN}[RedCrack] Actualización cancelada por el usuario.${NC}"
+        fi
+    else
+        echo -e "${CYAN}[RedCrack] Ya tenés la última versión.${NC}"
     fi
+
 fi
 
+# ELIMINA LA SIGUIENTE LÍNEA - Es la que causa el problema de bucle infinito
+# bash "$LOCAL_PATH"
 
 
-# --- Comprobación modo monitor ---
+# ------------ Verificacion archivo oui.txt (base de datos MAC de distintos fabricantes)------------
+
+# Calcular el hash del archivo OUI local (si existe)
+local_oui_hash=""
+if [ -f "$OUI_PATH" ]; then
+    local_oui_hash=$(sha256sum "$OUI_PATH" | awk '{print $1}')
+else
+    echo -e "${YELLOW}[RedCrack] No se encontró el archivo OUI local, descargando la versión inicial...${NC}"
+    wget -q --timeout=5 "$OUI_URL" -O "$TMP_OUI"
+    sudo mkdir -p "$(dirname "$OUI_PATH")" # Asegurar que el directorio exista
+    sudo mv "$TMP_OUI" "$OUI_PATH"
+    echo -e "${CYAN}[RedCrack] Archivo OUI descargado.${NC}"
+    local_oui_hash=$(sha256sum "$OUI_PATH" | awk '{print $1}') # Calcular el hash de la recién descargada
+fi
+
+# Obtener el contenido del archivo OUI remoto y calcular su hash
+remote_oui_hash=$(wget -qO- "$OUI_URL" 2>/dev/null | sha256sum | awk '{print $1}')
+
+# Comparar hashes y actualizar automáticamente si es necesario
+if [[ "$remote_oui_hash" != "$local_oui_hash" ]]; then
+    echo -e "${YELLOW}[RedCrack] Se encontró una nueva versión del archivo OUI, actualizando...${NC}"
+    wget -q --timeout=5 "$OUI_URL" -O "$TMP_OUI"
+    sudo mv "$TMP_OUI" "$OUI_PATH" -f # Forzar la sobreescritura si es necesario
+    echo -e "${CYAN}[RedCrack] Archivo OUI actualizado.${NC}"
+else
+    echo -e "${CYAN}[RedCrack] El archivo OUI está actualizado.${NC}"
+fi
+
+# --------------------------------------- ACTIVAR MODO MONITOR ---------------------------------------
+
+# Comprobacion de modo monitor
 
 INTERFAZ=$(airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
+
 if [ -z "$INTERFAZ" ]; then
     echo -e "${RED}No se encontró ninguna interfaz inalámbrica.${NC}"
     exit 1
 fi
 
 if ! iwconfig "$INTERFAZ" 2>/dev/null | grep -q "Mode:Monitor"; then
-    echo -e "${YELLOW}Cambiando interfaz a modo monitor${NC}"
+    echo -e "${YELLOW}La interfaz $INTERFAZ no está en modo monitor. Configurando...${NC}"
     sudo airmon-ng check kill > /dev/null 2>&1
     sudo airmon-ng start "$INTERFAZ" > /dev/null
     INTERFAZ_MONITOR=$(iwconfig 2>/dev/null | awk '/Mode:Monitor/ {print $1}' | head -n1)
+    
     if [ -z "$INTERFAZ_MONITOR" ]; then
         echo -e "${RED}Fallo al activar modo monitor.${NC}"
         exit 1
@@ -99,17 +161,21 @@ else
     INTERFAZ_MONITOR="$INTERFAZ"
 fi
 
-# --- Captura ---
+echo -e "${NC}Interfaz en modo monitor: $INTERFAZ_MONITOR${NC}"
+
 rm -f captura*.*
+
+echo -e "${YELLOW}Abriendo airodump-ng en esta terminal...${NC}"
 airodump-ng "$INTERFAZ_MONITOR" --band abg --write captura --output-format netxml,csv &
 AIROD_PID=$!
 
 read -p "Presioná ENTER cuando quieras procesar los resultados..."
+
 kill "$AIROD_PID"
 sleep 2
 
-# Limpiar DTD innecesario
 sed -i '/<!DOCTYPE.*kismet.*dtd">/d' captura-01.kismet.netxml
+
 if [ ! -f captura-01.kismet.netxml ]; then
     echo -e "${RED}Error: El archivo de captura no se generó correctamente.${NC}"
     exit 1
@@ -118,56 +184,79 @@ fi
 
 #========== REDES DETECTADAS ==========
 
+# Imprime un título en consola con formato de color
 echo -e "\n${WHITE}========== REDES DETECTADAS ==========\n${NC}"
+
+# Muestra los encabezados de la tabla para las redes detectadas
 printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "Red" "MAC (punto de acceso)" "Fabricante" "Intens." "Canal" "Encriptación"
+
+# Extrae información de redes tipo "infrastructure" desde el archivo XML generado por Kismet
 xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
-  -v "SSID/essid" -o "|" \
-  -v "BSSID" -o "|" \
-  -v "snr-info/last_signal_dbm" -o "|" \
-  -v "channel" -o "|" \
-  -v "SSID/encryption" -o "|" \
+  -v "SSID/essid" -o "|" \                          # Nombre de la red
+  -v "BSSID" -o "|" \                               # MAC del punto de acceso
+  -v "snr-info/last_signal_dbm" -o "|" \            # Intensidad de señal
+  -v "channel" -o "|" \                             # Canal
+  -v "SSID/encryption" -o "|" \                     # Tipo de encriptación
   -v "manuf" -n captura-01.kismet.netxml 2>/dev/null | while IFS='|' read -r essid bssid signal channel enc fabricante; do
+    # Si el nombre de la red está vacío, se muestra como "(oculta)"
     [ -z "$essid" ] && essid="(oculta)"
+    # Si el fabricante no está disponible, se marca como "Unknown"
     [ -z "$fabricante" ] && fabricante="Unknown"
+
+    # Muestra los datos formateados en una tabla
     printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "$essid" "$bssid" "$fabricante" "$signal" "$channel" "$enc"
 done
 
-
 #========== CLIENTES DETECTADOS ==========
 
+# Línea en blanco y título para la sección de clientes detectados
 echo
 echo -e "${WHITE}========== CLIENTES DETECTADOS ==========${NC}"
 echo
+
+# Encabezados de la tabla para mostrar clientes conectados o presentes
 printf "%-17s %-11s %-36s %-11s %-17s %-20s\n" "MAC" "Conectividad" "Fabricante" "Intensidad" "Asociado a" "Red"
 
+# Extrae información de clientes desde el archivo XML
 xmlstarlet sel --skip-dtd -t -m "//wireless-network/wireless-client" \
-  -v "../BSSID" -o "|" \
-  -v "client-mac" -o "|" \
-  -v "@type" -o "|" \
+  -v "../BSSID" -o "|" \                           # MAC del AP asociado
+  -v "client-mac" -o "|" \                         # MAC del cliente
+  -v "@type" -o "|" \                              # Tipo de conectividad (from, to, etc.)
   -v "snr-info/last_signal_dbm" -n captura-01.kismet.netxml 2>/dev/null |
 while IFS='|' read -r bssid mac tipo intensidad; do
+    # Omite clientes con MAC vacía o no válida
     [[ -z "$mac" || "$mac" == "00:00:00:00:00:00" ]] && continue
 
-    fabricante=$(grep -i "$(echo $mac | cut -d':' -f1-3)" oui.txt | awk -F"\t" '{print $2}')
+    # Busca el fabricante en la base de datos local (oui.txt)
+    fabricante=$(grep -i "$(echo $mac | cut -d':' -f1-3)" "$OUI_PATH" 2>/dev/null | awk -F"\t" '{print $2}')
+    
+    # Si no se encuentra en el archivo OUI, busca en el XML
     [ -z "$fabricante" ] && fabricante=$(xmlstarlet sel --skip-dtd -t -m "//wireless-client[client-mac='$mac']" -v "client-manuf" captura-01.kismet.netxml)
+    
+    # Si aún está vacío, se pone como "Unknown"
     [ -z "$fabricante" ] && fabricante="Unknown"
 
+    # Obtiene el nombre de la red (ESSID) asociada al AP
     essid=$(xmlstarlet sel --skip-dtd -t -m "//wireless-network[BSSID='$bssid']" -v "SSID/essid" captura-01.kismet.netxml)
 
+    # Define color según la intensidad de señal
     COLOR_INT="${NC}"
     [[ "$intensidad" -ge -50 ]] && COLOR_INT="${GREEN}"
     [[ "$intensidad" -lt -50 && "$intensidad" -gt -70 ]] && COLOR_INT="${YELLOW}"
     [[ "$intensidad" -le -70 ]] && COLOR_INT="${RED}"
 
+    # Imprime la información del cliente formateada con colores
     printf "%-17s %-11s %-36s ${COLOR_INT}%-11s${NC} %-17s %-20s\n" "$mac" "$tipo" "$fabricante" "$intensidad" "$bssid" "$essid"
 done
 
 
-
 # --- Restablecer conexión ---
 
+# Detiene el modo monitor de la interfaz utilizada
 sudo airmon-ng stop "$INTERFAZ_MONITOR"
 echo -e "Modo monitor detenido en $INTERFAZ_MONITOR"
+
+# Reinicia el administrador de red y solicita nueva IP
 sudo service NetworkManager restart
 sudo dhclient "$INTERFAZ"
 echo -e "${YELLOW}Conexión restablecida${NC}"
