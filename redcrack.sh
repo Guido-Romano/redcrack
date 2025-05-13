@@ -17,76 +17,22 @@ NC='\033[0m'
 REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/rama01/redcrack.sh"
 SCRIPT_PATH="$0"
 
-
-# Verificar si hay una nueva versión disponible
-verificar_actualizacion() {
-    if [[ -n "$REMOTE_CONTENT" ]]; then
-        REMOTE_HASH=$(echo "$REMOTE_CONTENT" | sha256sum | awk '{print $1}')
-        
-        # Comparar hashes solo si son diferentes
-        if [[ "$LOCAL_HASH" != "$REMOTE_HASH" ]]; then
-            echo -e "\e[33mSe ha detectado una nueva versión del software.\e[0m"
-            echo -e "\e[34mVersiones:\e[0m"
-            echo -e "  Versión actual: \e[32m$LOCAL_HASH\e[0m"
-            echo -e "  Versión nueva:  \e[36m$REMOTE_HASH\e[0m"
-            
-            # Preguntar explícitamente antes de cualquier actualización
-            while true; do
-                read -p "¿Desea actualizar el software? (s/n): " respuesta
-                
-                case "$respuesta" in
-                    [sS]|[sS][iI])
-                        echo "Iniciando proceso de actualización..."
-                        # Aquí solo PREPARAMOS la actualización, NO la ejecutamos automáticamente
-                        return 0  # Indica que el usuario quiere actualizar
-                        ;;
-                    [nN]|[nN][oO])
-                        echo "Actualización cancelada. Continuando con la versión actual."
-                        return 1  # Indica que el usuario NO quiere actualizar
-                        ;;
-                    *)
-                        echo -e "\e[31mRespuesta inválida. Por favor, responda 's' o 'n'.\e[0m"
-                        ;;
-                esac
-            done
-        fi
-    else
-        echo -e "\e[31mNo se pudo verificar la última versión. Compruebe su conexión a internet.\e[0m"
-        return 1
-    fi
-    
-    # Si los hashes son iguales o no hay contenido remoto
-    return 1
-}
-
-# Función de actualización separada
-realizar_actualizacion() {
-    if [[ -n "$REMOTE_CONTENT" ]]; then
-        # Crear script temporal
-        TMP_SCRIPT="$(mktemp)"
-        echo "$REMOTE_CONTENT" > "$TMP_SCRIPT"
-        chmod +x "$TMP_SCRIPT"
-        
-        echo "Ejecutando nueva versión..."
-        # Cambiar al nuevo script
-        exec bash "$TMP_SCRIPT"
-        exit 0
-    else
-        echo "No hay contenido para actualizar."
-        exit 1
-    fi
-}
-
-
-# verificar si hay actualización
-
-if verificar_actualizacion; then
-    # Si el usuario confirma, realizamos la actualización
-    read -p "Presione Enter para continuar con la actualización o Ctrl+C para cancelar..." 
-    realizar_actualizacion
-else
-    echo "No se requiere actualización."
+# --- Opción de ejecución remota ---
+if [[ "$1" == "--update" ]]; then
+    echo -e "${CYAN}Descargando la última versión desde GitHub...${NC}"
+    bash <(curl -s "$REPO_URL")
+    exit 0
 fi
+
+# --- Mensaje de actualización ---
+echo -e "${YELLOW}Si deseas ejecutar la última versión directamente desde GitHub, usa:${NC}"
+echo -e "${WHITE}bash <(curl -s $REPO_URL)${NC}"
+
+# --- Continuación del script ---
+echo -e "\n${CYAN}Ejecutando RedCrack v$VERSION...${NC}"
+
+
+
 
 # --- Banner ---
 
