@@ -3,7 +3,7 @@ set -e
 
 # ------------------------------------ VARIABLES GLOBALES ------------------------------------
 
-readonly VERSION="0.3.7"
+readonly VERSION="0.3.8"
 
 # Colores
 RED='\033[0;31m'
