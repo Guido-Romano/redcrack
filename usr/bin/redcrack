@@ -13,7 +13,7 @@ WHITE='\033[1;37m'
 NC='\033[0m'
 
 # URLs y rutas
-readonly REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/rama01/redcrack.sh"
+readonly REPO_URL="https://raw.githubusercontent.com/Guido-Romano/redcrack/main/usr/bin/redcrack"
 readonly INSTALL_PATH="/usr/bin/redcrack"
 readonly TMP_PATH="/tmp/redcrack_latest.sh"
 
@@ -33,7 +33,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
         if [[ "$current_hash" != "$remote_hash" ]]; then
             echo -e "${YELLOW}[RedCrack] Se encontró una nueva versión disponible.${NC}"
-            read -p "$(echo -e "${YELLOW}[RedCrack] ¿Deseás actualizar e instalar la última versión? (s/N): ${NC}")" confirm
+            read -p "$(echo -e "[RedCrack] ¿Deseás actualizar e instalar la última versión? (s/N): ")" confirm
 
             if [[ "$confirm" =~ ^[sS]$ ]]; then
                 sudo cp "$TMP_PATH" "$INSTALL_PATH"
