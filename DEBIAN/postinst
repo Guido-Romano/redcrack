@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo "[RedCrack] Verificando dependencias..."
+
+DEPENDENCIAS=(aircrack-ng iw iwconfig wget xmlstarlet mate-terminal)
+
+for pkg in "${DEPENDENCIAS[@]}"; do
+    if ! command -v "$pkg" &>/dev/null; then
+        echo "[RedCrack] Instalando dependencia faltante: $pkg"
+        apt-get install -y "$pkg"
+    else
+        echo "[RedCrack] $pkg ya está instalado."
+    fi
+done
+
+echo "[RedCrack] Dependencias verificadas."

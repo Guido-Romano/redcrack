@@ -1,0 +1,10 @@
+Package: redcrack
+Version: 0.2
+Section: utils
+Priority: optional
+Architecture: all
+Depends: aircrack-ng, wireless-tools, iw, xmlstarlet, wget, mate-terminal, curl
+Maintainer: Guido Romano <guidoromano1989@gmail.com>
+Description: Herramienta de auditoría WiFi automatizada
+ Esta herramienta detecta redes WiFi, identifica fabricantes y clientes conectados.
+ Utiliza airodump-ng, xmlstarlet y otras utilidades para analizar el entorno inalámbrico.

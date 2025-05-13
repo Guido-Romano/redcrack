@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=RedCrack
+Comment=Herramienta de auditoría WiFi
+Exec=mate-terminal -e redcrack
+Icon=redcrack_icon
+Terminal=true
+Type=Application
+Categories=Utility;Network;Security;
