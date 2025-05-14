@@ -1,0 +1,21 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        echo "[RedCrack] Ejecutando script prerm..."
+
+        # Eliminar acceso directo si fue copiado manualmente
+        if [ -f "/usr/share/applications/redcrack.desktop" ]; then
+            echo "[RedCrack] Eliminando acceso directo..."
+            rm -f "/usr/share/applications/redcrack.desktop"
+        fi
+
+        # Nota: no se tocan los archivos de /etc/redcrack ni /usr/share/redcrack
+        # porque serán eliminados automáticamente por dpkg si están en el paquete.
+
+        ;;
+esac
+
+exit 0
+
