@@ -25,7 +25,7 @@ readonly OUI_PATH="/usr/share/redcrack/oui.txt"
 readonly TMP_OUI="${TMP_BASE}/oui_latest.txt"
 readonly OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
 
-readonly XML_FILE="${TMP_BASE}/captura-01.kismet.netxml"
+XML_FILE="${TMP_BASE}/captura-01.kismet.netxml"
 readonly TMP_DIR="${TMP_BASE}" # Definimos TMP_DIR para usarlo con airodump-ng
 
 
