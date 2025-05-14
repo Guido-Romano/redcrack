@@ -3,7 +3,7 @@ set -e
 
 # ------------------------------------ VARIABLES GLOBALES ------------------------------------
 
-readonly VERSION="0.3.8"
+readonly VERSION="0.3.9"
 
 # Colores
 RED='\033[0;31m'
@@ -20,6 +20,11 @@ readonly TMP_PATH="/tmp/redcrack_latest.sh"
 readonly OUI_PATH="/usr/share/redcrack/oui.txt"
 readonly TMP_OUI="/tmp/oui_latest.txt"
 readonly OUI_URL="https://standards-oui.ieee.org/oui/oui.txt"
+readonly XML_FILE="$TMP_DIR/captura-01.kismet.netxml"
+
+readonly TMP_DIR="/usr/share/redcrack/tmp"
+mkdir -p "$TMP_DIR"
+
 
 # -------------------------------- COMPROBACION DE ACTUALIZACIONES DEL SCRIPT --------------------------------
 
@@ -49,24 +54,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         fi
     else
         echo -e "${RED}[RedCrack] No se pudo verificar actualizaciones.${NC}"
-    fi
-fi
-
-# -------------------- VERIFICACION AUTOMÁTICA SILENCIOSA DEL ARCHIVO OUI --------------------
-
-local_oui_hash=""
-if [[ -f "$OUI_PATH" ]]; then
-    local_oui_hash=$(sha256sum "$OUI_PATH" | awk '{print $1}')
-fi
-
-if curl -fsSL "$OUI_URL" -o "$TMP_OUI"; then
-    remote_oui_hash=$(sha256sum "$TMP_OUI" | awk '{print $1}')
-
-    if [[ "$remote_oui_hash" != "$local_oui_hash" ]]; then
-        sudo mkdir -p "$(dirname "$OUI_PATH")"
-        sudo mv "$TMP_OUI" "$OUI_PATH"
-    else
-        rm -f "$TMP_OUI"
     fi
 fi
 
@@ -111,6 +98,24 @@ echo "##########################################################################
 echo -e "${NC}"
 echo
 
+# -------------------- VERIFICACION AUTOMÁTICA SILENCIOSA DEL ARCHIVO OUI --------------------
+
+local_oui_hash=""
+if [[ -f "$OUI_PATH" ]]; then
+    local_oui_hash=$(sha256sum "$OUI_PATH" | awk '{print $1}')
+fi
+
+if curl -fsSL "$OUI_URL" -o "$TMP_OUI"; then
+    remote_oui_hash=$(sha256sum "$TMP_OUI" | awk '{print $1}')
+
+    if [[ "$remote_oui_hash" != "$local_oui_hash" ]]; then
+        sudo mkdir -p "$(dirname "$OUI_PATH")"
+        sudo mv "$TMP_OUI" "$OUI_PATH"
+    else
+        rm -f "$TMP_OUI"
+    fi
+fi
+
 
 # --------------------------------------- ACTIVAR MODO MONITOR ---------------------------------------
 
@@ -142,7 +147,7 @@ echo -e "${NC}Interfaz en modo monitor: $INTERFAZ_MONITOR${NC}"
 rm -f captura*.*
 
 echo -e "${YELLOW}Abriendo airodump-ng en esta terminal...${NC}"
-airodump-ng "$INTERFAZ_MONITOR" --band abg --write captura --output-format netxml,csv &
+airodump-ng "$INTERFAZ_MONITOR" --band abg --write "$TMP_DIR/captura" --output-format netxml,csv &
 AIROD_PID=$!
 
 read -p "Presioná ENTER cuando quieras procesar los resultados..."
@@ -150,7 +155,7 @@ read -p "Presioná ENTER cuando quieras procesar los resultados..."
 kill "$AIROD_PID"
 sleep 2
 
-sed -i '/<!DOCTYPE.*kismet.*dtd">/d' captura-01.kismet.netxml
+sed -i '/<!DOCTYPE.*kismet.*dtd">/d' "$XML_FILE"
 
 if [ ! -f captura-01.kismet.netxml ]; then
     echo -e "${RED}Error: El archivo de captura no se generó correctamente.${NC}"
@@ -159,6 +164,9 @@ fi
 
 
 #========== REDES DETECTADAS ==========
+
+XML_FILE="../../../captura-01.kismet.netxml"
+
 
 # Imprime un título en consola con formato de color
 echo -e "\n${WHITE}========== REDES DETECTADAS ==========\n${NC}"
@@ -173,7 +181,7 @@ xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
   -v "snr-info/last_signal_dbm" -o "|" \            # Intensidad de señal
   -v "channel" -o "|" \                             # Canal
   -v "SSID/encryption" -o "|" \                     # Tipo de encriptación
-  -v "manuf" -n captura-01.kismet.netxml 2>/dev/null | while IFS='|' read -r essid bssid signal channel enc fabricante; do
+  -v "manuf" -n "$XML_FILE" 2>/dev/null | while IFS='|' read -r essid bssid signal channel enc fabricante; do
     # Si el nombre de la red está vacío, se muestra como "(oculta)"
     [ -z "$essid" ] && essid="(oculta)"
     # Si el fabricante no está disponible, se marca como "Unknown"
@@ -198,7 +206,8 @@ xmlstarlet sel --skip-dtd -t -m "//wireless-network/wireless-client" \
   -v "../BSSID" -o "|" \                           # MAC del AP asociado
   -v "client-mac" -o "|" \                         # MAC del cliente
   -v "@type" -o "|" \                              # Tipo de conectividad (from, to, etc.)
-  -v "snr-info/last_signal_dbm" -n captura-01.kismet.netxml 2>/dev/null |
+  -v "snr-info/last_signal_dbm" -n "$XML_FILE" 2>/dev/null
+ |
 while IFS='|' read -r bssid mac tipo intensidad; do
     # Omite clientes con MAC vacía o no válida
     [[ -z "$mac" || "$mac" == "00:00:00:00:00:00" ]] && continue
@@ -207,13 +216,13 @@ while IFS='|' read -r bssid mac tipo intensidad; do
     fabricante=$(grep -i "$(echo $mac | cut -d':' -f1-3)" "$OUI_PATH" 2>/dev/null | awk -F"\t" '{print $2}')
     
     # Si no se encuentra en el archivo OUI, busca en el XML
-    [ -z "$fabricante" ] && fabricante=$(xmlstarlet sel --skip-dtd -t -m "//wireless-client[client-mac='$mac']" -v "client-manuf" captura-01.kismet.netxml)
+    [ -z "$fabricante" ] && fabricante=$(xmlstarlet sel --skip-dtd -t -m "//wireless-client[client-mac='$mac']" -v "client-manuf" "$XML_FILE")
     
     # Si aún está vacío, se pone como "Unknown"
     [ -z "$fabricante" ] && fabricante="Unknown"
 
     # Obtiene el nombre de la red (ESSID) asociada al AP
-    essid=$(xmlstarlet sel --skip-dtd -t -m "//wireless-network[BSSID='$bssid']" -v "SSID/essid" captura-01.kismet.netxml)
+    essid=$(xmlstarlet sel --skip-dtd -t -m "//wireless-network[BSSID='$bssid']" -v "SSID/essid" "$XML_FILE")
 
     # Define color según la intensidad de señal
     COLOR_INT="${NC}"
@@ -236,3 +245,5 @@ echo -e "Modo monitor detenido en $INTERFAZ_MONITOR"
 sudo service NetworkManager restart
 sudo dhclient "$INTERFAZ"
 echo -e "${YELLOW}Conexión restablecida${NC}"
+
+rm -f "$TMP_DIR/captura-"*
