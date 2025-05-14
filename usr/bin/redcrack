@@ -125,7 +125,7 @@ fi
 
 # Comprobacion de modo monitor
 
-INTERFAZ=$(airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
+INTERFAZ=$(sudo airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
 
 if [ -z "$INTERFAZ" ]; then
     echo -e "${RED}No se encontró ninguna interfaz inalámbrica.${NC}"
