@@ -4,7 +4,7 @@ set -e
 
 # ------------------------------------ VARIABLES GLOBALES ------------------------------------
 
-readonly VERSION="0.4"
+readonly VERSION="0.4.1"
 
 # Colores
 readonly RED='\033[0;31m'
@@ -125,7 +125,9 @@ fi
 
 # Comprobacion de modo monitor
 
-INTERFAZ=$(sudo airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
+INTERFAZ=$(airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
+
+
 
 if [ -z "$INTERFAZ" ]; then
     echo -e "${RED}No se encontró ninguna interfaz inalámbrica.${NC}"
@@ -148,7 +150,9 @@ fi
 
 echo -e "${NC}Interfaz en modo monitor: $INTERFAZ_MONITOR${NC}"
 
-rm -f captura*.*
+mkdir -p "$TMP_DIR"
+rm -f "$TMP_DIR"/captura-*
+
 
 echo -e "${YELLOW}Abriendo airodump-ng en esta terminal...${NC}"
 airodump-ng "$INTERFAZ_MONITOR" --band abg --write "$TMP_DIR/captura" --output-format netxml &
@@ -160,12 +164,20 @@ read -p "Presioná ENTER cuando quieras procesar los resultados..."
 kill "$AIROD_PID"
 sleep 2
 
-sed -i '/<!DOCTYPE.*kismet.*dtd">/d' "$XML_FILE"
+# Buscar el archivo .netxml generado
+XML_FILE=$(find "$TMP_DIR" -type f -name "*-01.kismet.netxml" | head -n1)
 
-if [ ! -f captura-01.kismet.netxml ]; then
+# Mostrar si se encontró algo (debug)
+if [ -z "$XML_FILE" ]; then
     echo -e "${RED}Error: El archivo de captura no se generó correctamente.${NC}"
+    echo -e "${YELLOW}[Debug] Contenido de $TMP_DIR:${NC}"
+    ls -lh "$TMP_DIR"
     exit 1
 fi
+
+# Eliminar DTD si está presente
+sed -i '/<!DOCTYPE.*kismet.*dtd">/d' "$XML_FILE"
+
 
 
 # ========== REDES DETECTADAS ==========
