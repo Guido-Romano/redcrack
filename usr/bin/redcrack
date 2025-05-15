@@ -4,7 +4,7 @@ set -e
 
 # ------------------------------------ VARIABLES GLOBALES ------------------------------------
 
-readonly VERSION="0.4.2"
+readonly VERSION="0.4.3"
 
 # Colores
 readonly RED='\033[0;31m'
@@ -104,102 +104,158 @@ echo
 
 # -------------------- VERIFICACION AUTOMÁTICA SILENCIOSA DEL ARCHIVO OUI --------------------
 
+echo -e "${CYAN}[DEBUG] Iniciando verificación del archivo OUI...${NC}"
+
 local_oui_hash=""
 if [[ -f "$OUI_PATH" ]]; then
+    echo -e "${CYAN}[DEBUG] Archivo OUI local encontrado en: $OUI_PATH${NC}"
     local_oui_hash=$(sha256sum "$OUI_PATH" | awk '{print $1}')
+    echo -e "${CYAN}[DEBUG] Hash local OUI: $local_oui_hash${NC}"
+else
+    echo -e "${CYAN}[DEBUG] No se encontró archivo OUI local en $OUI_PATH${NC}"
 fi
 
+echo -e "${CYAN}[DEBUG] Descargando OUI desde $OUI_URL${NC}"
 if curl -fsSL "$OUI_URL" -o "$TMP_OUI"; then
+    echo -e "${CYAN}[DEBUG] OUI descargado exitosamente a $TMP_OUI${NC}"
     remote_oui_hash=$(sha256sum "$TMP_OUI" | awk '{print $1}')
+    echo -e "${CYAN}[DEBUG] Hash remoto OUI: $remote_oui_hash${NC}"
 
     if [[ "$remote_oui_hash" != "$local_oui_hash" ]]; then
+        echo -e "${CYAN}[DEBUG] El archivo OUI local necesita actualizarse${NC}"
         sudo mkdir -p "$(dirname "$OUI_PATH")"
-        sudo mv "$TMP_OUI" "$OUI_PATH"
+        echo -e "${CYAN}[DEBUG] Moviendo $TMP_OUI a $OUI_PATH${NC}"
+        if sudo mv "$TMP_OUI" "$OUI_PATH"; then
+            echo -e "${CYAN}[DEBUG] Archivo OUI actualizado correctamente${NC}"
+        else
+            echo -e "${RED}[DEBUG ERROR] No se pudo mover el archivo OUI${NC}"
+        fi
     else
+        echo -e "${CYAN}[DEBUG] El archivo OUI local está actualizado${NC}"
         rm -f "$TMP_OUI"
     fi
+else
+    echo -e "${RED}[DEBUG ERROR] No se pudo descargar el archivo OUI${NC}"
 fi
 
 
 # --------------------------------------- ACTIVAR MODO MONITOR ---------------------------------------
 
+echo -e "${CYAN}[DEBUG] Iniciando activación de modo monitor...${NC}"
+
 # Comprobacion de modo monitor
-
+echo -e "${CYAN}[DEBUG] Buscando interfaces inalámbricas disponibles...${NC}"
 INTERFAZ=$(airmon-ng | awk 'NR>2 && $1!="" {print $2; exit}')
-
+echo -e "${CYAN}[DEBUG] Interfaces encontradas: $(airmon-ng | awk 'NR>2 && $1!="" {print $2}')${NC}"
+echo -e "${CYAN}[DEBUG] Interfaz seleccionada: $INTERFAZ${NC}"
 
 
 if [ -z "$INTERFAZ" ]; then
-    echo -e "${RED}No se encontró ninguna interfaz inalámbrica.${NC}"
+    echo -e "${RED}[DEBUG ERROR] No se encontró ninguna interfaz inalámbrica.${NC}"
     exit 1
 fi
 
+echo -e "${CYAN}[DEBUG] Verificando si $INTERFAZ está en modo monitor...${NC}"
 if ! iwconfig "$INTERFAZ" 2>/dev/null | grep -q "Mode:Monitor"; then
-    echo -e "${YELLOW}La interfaz $INTERFAZ no está en modo monitor. Configurando...${NC}"
+    echo -e "${YELLOW}[DEBUG] La interfaz $INTERFAZ no está en modo monitor. Configurando...${NC}"
+    echo -e "${CYAN}[DEBUG] Ejecutando airmon-ng check kill...${NC}"
     sudo airmon-ng check kill > /dev/null 2>&1
+    echo -e "${CYAN}[DEBUG] Iniciando modo monitor en $INTERFAZ...${NC}"
     sudo airmon-ng start "$INTERFAZ" > /dev/null
+    echo -e "${CYAN}[DEBUG] Buscando interfaces en modo monitor...${NC}"
     INTERFAZ_MONITOR=$(iwconfig 2>/dev/null | awk '/Mode:Monitor/ {print $1}' | head -n1)
+    echo -e "${CYAN}[DEBUG] Resultado de búsqueda de interfaces monitor: $INTERFAZ_MONITOR${NC}"
     
     if [ -z "$INTERFAZ_MONITOR" ]; then
-        echo -e "${RED}Fallo al activar modo monitor.${NC}"
+        echo -e "${RED}[DEBUG ERROR] Fallo al activar modo monitor.${NC}"
         exit 1
     fi
 else
+    echo -e "${CYAN}[DEBUG] Interfaz ya está en modo monitor${NC}"
     INTERFAZ_MONITOR="$INTERFAZ"
 fi
 
 echo -e "${NC}Interfaz en modo monitor: $INTERFAZ_MONITOR${NC}"
 
+echo -e "${CYAN}[DEBUG] Creando directorio temporal $TMP_DIR${NC}"
 mkdir -p "$TMP_DIR"
+echo -e "${CYAN}[DEBUG] Limpiando archivos temporales anteriores${NC}"
 rm -f "$TMP_DIR"/captura-*
 
 
 echo -e "${YELLOW}Abriendo airodump-ng en esta terminal...${NC}"
+echo -e "${CYAN}[DEBUG] Ejecutando airodump-ng en $INTERFAZ_MONITOR, guardando en $TMP_DIR/captura${NC}"
 airodump-ng "$INTERFAZ_MONITOR" --band abg --write "$TMP_DIR/captura" --output-format netxml &
 
 AIROD_PID=$!
+echo -e "${CYAN}[DEBUG] PID de airodump-ng: $AIROD_PID${NC}"
 
 read -p "Presioná ENTER cuando quieras procesar los resultados..."
 
+echo -e "${CYAN}[DEBUG] Terminando airodump-ng (PID: $AIROD_PID)${NC}"
 kill "$AIROD_PID"
+echo -e "${CYAN}[DEBUG] Esperando 2 segundos para asegurar que los archivos se guarden correctamente${NC}"
 sleep 2
 
 # Buscar el archivo .netxml generado
+echo -e "${CYAN}[DEBUG] Buscando archivo netxml generado en $TMP_DIR${NC}"
 XML_FILE=$(find "$TMP_DIR" -type f -name "*-01.kismet.netxml" | head -n1)
+echo -e "${CYAN}[DEBUG] Archivo netxml encontrado: $XML_FILE${NC}"
 
 # Mostrar si se encontró algo (debug)
 if [ -z "$XML_FILE" ]; then
-    echo -e "${RED}Error: El archivo de captura no se generó correctamente.${NC}"
-    echo -e "${YELLOW}[Debug] Contenido de $TMP_DIR:${NC}"
+    echo -e "${RED}[DEBUG ERROR] El archivo de captura no se generó correctamente.${NC}"
+    echo -e "${YELLOW}[DEBUG] Contenido de $TMP_DIR:${NC}"
     ls -lh "$TMP_DIR"
     exit 1
 fi
 
-# Eliminar cualquier referencia a DTD para evitar errores de procesamiento
+echo -e "${CYAN}[DEBUG] Verificando permisos del archivo $XML_FILE${NC}"
+ls -la "$XML_FILE"
+
+echo -e "${CYAN}[DEBUG] Analizando contenido del archivo XML (primeras 10 líneas)${NC}"
+head -10 "$XML_FILE"
+
+echo -e "${CYAN}[DEBUG] Eliminando referencias DTD y ENTITY del archivo XML${NC}"
 sed -i '/<!\(DOCTYPE\|ENTITY\).*>/d' "$XML_FILE"
+echo -e "${CYAN}[DEBUG] Verificando archivo XML después de eliminar DTD${NC}"
+grep -n "<!DOCTYPE" "$XML_FILE" || echo -e "${CYAN}[DEBUG] No se encontraron referencias a DOCTYPE${NC}"
 
 # Asegurarnos que el archivo existe y es legible
+echo -e "${CYAN}[DEBUG] Verificando que el archivo $XML_FILE existe y es legible${NC}"
 if [ ! -r "$XML_FILE" ]; then
-    echo -e "${RED}Error: No se puede leer el archivo $XML_FILE${NC}"
+    echo -e "${RED}[DEBUG ERROR] No se puede leer el archivo $XML_FILE${NC}"
     exit 1
 fi
 
 # Verificar que el archivo XML es válido
-if ! xmlstarlet val -w "$XML_FILE" > /dev/null 2>&1; then
-    echo -e "${YELLOW}Advertencia: El archivo XML podría no ser válido. Intentando repararlo...${NC}"
+echo -e "${CYAN}[DEBUG] Validando estructura del archivo XML${NC}"
+if xmlstarlet val -w "$XML_FILE" > /dev/null 2>&1; then
+    echo -e "${CYAN}[DEBUG] El archivo XML es válido${NC}"
+else
+    echo -e "${YELLOW}[DEBUG] El archivo XML no es válido. Intentando repararlo...${NC}"
+    echo -e "${CYAN}[DEBUG] Error de validación:${NC}"
+    xmlstarlet val -w "$XML_FILE"
+    
     # Eliminamos líneas problemáticas y nos aseguramos de tener un XML bien formado
     # Creamos un archivo temporal
     TMP_XML="${TMP_DIR}/temp_fixed.xml"
     
+    echo -e "${CYAN}[DEBUG] Creando archivo temporal $TMP_XML para reparación${NC}"
     # Limpieza básica del XML
+    echo -e "${CYAN}[DEBUG] Limpiando XML problemático${NC}"
     cat "$XML_FILE" | grep -v "DOCTYPE" | grep -v "ENTITY" > "$TMP_XML"
+    
+    echo -e "${CYAN}[DEBUG] Verificando tamaño del archivo reparado: $(wc -l < "$TMP_XML") líneas${NC}"
     
     # Reemplazamos el archivo original solo si el temporal existe y tiene contenido
     if [ -s "$TMP_XML" ]; then
+        echo -e "${CYAN}[DEBUG] Sustituyendo archivo original con versión reparada${NC}"
         mv "$TMP_XML" "$XML_FILE"
         chmod 644 "$XML_FILE"
+        echo -e "${CYAN}[DEBUG] Permisos actualizados: $(ls -la "$XML_FILE")${NC}"
     else
-        echo -e "${RED}Error: No se pudo reparar el archivo XML.${NC}"
+        echo -e "${RED}[DEBUG ERROR] No se pudo reparar el archivo XML. El archivo temporal está vacío.${NC}"
         exit 1
     fi
 fi
@@ -211,40 +267,100 @@ fi
 # Imprime un título en consola con formato de color
 echo -e "\n${WHITE}========== REDES DETECTADAS ==========\n${NC}"
 
+echo -e "${CYAN}[DEBUG] Iniciando procesamiento de redes detectadas${NC}"
+echo -e "${CYAN}[DEBUG] Archivo XML a procesar: $XML_FILE${NC}"
+
+# Comprobar si el archivo XML existe
+if [ ! -f "$XML_FILE" ]; then
+    echo -e "${RED}[DEBUG ERROR] Archivo XML no encontrado: $XML_FILE${NC}"
+    exit 1
+fi
+
+# Mostrar estructura general del XML para depuración
+echo -e "${CYAN}[DEBUG] Estructura general del XML (etiquetas principales):${NC}"
+grep -o "<[^/][^>]*>" "$XML_FILE" | sort | uniq -c | sort -nr | head -10
+
+# Contar nodos wireless-network
+echo -e "${CYAN}[DEBUG] Redes inalámbricas encontradas en el XML: $(grep -c "<wireless-network " "$XML_FILE")${NC}"
+
 # Muestra los encabezados de la tabla para las redes detectadas
 printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "Red" "MAC (punto de acceso)" "Fabricante" "Intens." "Canal" "Encriptación"
 
+echo -e "${CYAN}[DEBUG] Extrayendo información de redes con grep...${NC}"
+
+# Variable para contar redes procesadas
+REDES_PROCESADAS=0
+
 # Extraer redes con grep en lugar de xmlstarlet si hay problemas
-grep -A5 "<wireless-network type=\"infrastructure\"" "$XML_FILE" | while read -r line; do
+grep -n -A50 "<wireless-network type=\"infrastructure\"" "$XML_FILE" | while read -r line; do
+    # Extraer número de línea para debug
+    if [[ $line =~ ^([0-9]+)- ]]; then
+        LINEA_NUM=${BASH_REMATCH[1]}
+        echo -e "${CYAN}[DEBUG] Procesando línea $LINEA_NUM: ${line:${#LINEA_NUM}-1}${NC}"
+    fi
+    
     if echo "$line" | grep -q "<SSID>"; then
-        essid=$(grep -A2 "<SSID>" <<< "$line" | grep "<essid>" | sed -E 's/.*<essid>(.*)<\/essid>.*/\1/')
-        [ -z "$essid" ] && essid="(oculta)"
+        echo -e "${CYAN}[DEBUG] Encontrada etiqueta SSID${NC}"
+        # Extraer las siguientes líneas para buscar essid
+        SSID_CONTEXT=$(echo "$line" | grep -A5 "<SSID>")
+        echo -e "${CYAN}[DEBUG] Contexto SSID: $SSID_CONTEXT${NC}"
+        
+        essid=$(grep -o "<essid>.*</essid>" <<< "$SSID_CONTEXT" | sed -E 's/<essid>(.*)<\/essid>/\1/')
+        echo -e "${CYAN}[DEBUG] ESSID extraído: '$essid'${NC}"
+        [ -z "$essid" ] && essid="(oculta)" && echo -e "${CYAN}[DEBUG] ESSID vacío, establecido como: '$essid'${NC}"
     fi
     
     if echo "$line" | grep -q "<BSSID>"; then
+        echo -e "${CYAN}[DEBUG] Encontrada etiqueta BSSID${NC}"
         bssid=$(echo "$line" | sed -E 's/.*<BSSID>(.*)<\/BSSID>.*/\1/')
+        echo -e "${CYAN}[DEBUG] BSSID extraído: '$bssid'${NC}"
     fi
     
     if echo "$line" | grep -q "<last_signal_dbm>"; then
+        echo -e "${CYAN}[DEBUG] Encontrada etiqueta last_signal_dbm${NC}"
         signal=$(echo "$line" | sed -E 's/.*<last_signal_dbm>(.*)<\/last_signal_dbm>.*/\1/')
+        echo -e "${CYAN}[DEBUG] Señal extraída: '$signal'${NC}"
     fi
     
     if echo "$line" | grep -q "<channel>"; then
+        echo -e "${CYAN}[DEBUG] Encontrada etiqueta channel${NC}"
         channel=$(echo "$line" | sed -E 's/.*<channel>(.*)<\/channel>.*/\1/')
+        echo -e "${CYAN}[DEBUG] Canal extraído: '$channel'${NC}"
     fi
     
     if echo "$line" | grep -q "<encryption>"; then
+        echo -e "${CYAN}[DEBUG] Encontrada etiqueta encryption${NC}"
         enc=$(echo "$line" | sed -E 's/.*<encryption>(.*)<\/encryption>.*/\1/')
+        echo -e "${CYAN}[DEBUG] Encriptación extraída: '$enc'${NC}"
     fi
     
     if echo "$line" | grep -q "<manuf>"; then
+        echo -e "${CYAN}[DEBUG] Encontrada etiqueta manuf${NC}"
         fabricante=$(echo "$line" | sed -E 's/.*<manuf>(.*)<\/manuf>.*/\1/')
-        [ -z "$fabricante" ] && fabricante="Unknown"
+        [ -z "$fabricante" ] && fabricante="Unknown" && echo -e "${CYAN}[DEBUG] Fabricante no encontrado, establecido como: '$fabricante'${NC}"
+        echo -e "${CYAN}[DEBUG] Fabricante extraído: '$fabricante'${NC}"
         
-        # Imprimir la red una vez que tenemos todos los datos
-        printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "$essid" "$bssid" "$fabricante" "$signal" "$channel" "$enc"
-        
-        # Resetear variables para la próxima red
+        # Sólo si tenemos al menos BSSID y ESSID, imprimir la red 
+        if [[ ! -z "$bssid" && ! -z "$essid" ]]; then
+            echo -e "${CYAN}[DEBUG] Imprimiendo información de red completa${NC}"
+            printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "$essid" "$bssid" "$fabricante" "$signal" "$channel" "$enc"
+            REDES_PROCESADAS=$((REDES_PROCESADAS+1))
+            
+            # Resetear variables para la próxima red
+            essid=""
+            bssid=""
+            signal=""
+            channel=""
+            enc=""
+            fabricante=""
+        else
+            echo -e "${YELLOW}[DEBUG] Información incompleta para esta red, no se muestra${NC}"
+        fi
+    fi
+    
+    # Si encontramos el cierre de la red, también resetear variables
+    if echo "$line" | grep -q "</wireless-network>"; then
+        echo -e "${CYAN}[DEBUG] Fin de la red, reseteo de variables${NC}"
         essid=""
         bssid=""
         signal=""
@@ -253,6 +369,46 @@ grep -A5 "<wireless-network type=\"infrastructure\"" "$XML_FILE" | while read -r
         fabricante=""
     fi
 done
+
+echo -e "${CYAN}[DEBUG] Total de redes procesadas: $REDES_PROCESADAS${NC}"
+
+# Intentar con xmlstarlet si grep no funcionó (0 redes)
+if [ "$REDES_PROCESADAS" -eq 0 ]; then
+    echo -e "${YELLOW}[DEBUG] No se procesaron redes con grep. Intentando con xmlstarlet...${NC}"
+    
+    # Comprobamos que xmlstarlet está instalado
+    if ! which xmlstarlet >/dev/null; then
+        echo -e "${RED}[DEBUG ERROR] xmlstarlet no está instalado. Instalando...${NC}"
+        sudo apt-get install -y xmlstarlet || {
+            echo -e "${RED}[DEBUG ERROR] No se pudo instalar xmlstarlet${NC}"
+            exit 1
+        }
+    fi
+    
+    # Intentar procesar con xmlstarlet, mostrando errores
+    echo -e "${CYAN}[DEBUG] Ejecutando xmlstarlet para extraer redes...${NC}"
+    xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
+        -v "SSID/essid" -o "|" \
+        -v "BSSID" -o "|" \
+        -v "snr-info/last_signal_dbm" -o "|" \
+        -v "channel" -o "|" \
+        -v "SSID/encryption" -o "|" \
+        -v "manuf" -n "$XML_FILE" 2>&1 | tee /tmp/xmlstarlet_debug.log
+    
+    echo -e "${CYAN}[DEBUG] Resultado de xmlstarlet guardado en /tmp/xmlstarlet_debug.log${NC}"
+    
+    # Verificar si tenemos datos
+    if [ -s /tmp/xmlstarlet_debug.log ]; then
+        echo -e "${CYAN}[DEBUG] Procesando datos de xmlstarlet...${NC}"
+        cat /tmp/xmlstarlet_debug.log | while IFS='|' read -r essid bssid signal channel enc fabricante; do
+            [ -z "$essid" ] && essid="(oculta)"
+            [ -z "$fabricante" ] && fabricante="Unknown"
+            printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "$essid" "$bssid" "$fabricante" "$signal" "$channel" "$enc"
+        done
+    else
+        echo -e "${RED}[DEBUG ERROR] xmlstarlet no generó resultados${NC}"
+    fi
+fi
 
 #========== CLIENTES DETECTADOS ==========
 
