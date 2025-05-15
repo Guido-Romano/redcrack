@@ -4,7 +4,7 @@ set -e
 
 # ------------------------------------ VARIABLES GLOBALES ------------------------------------
 
-readonly VERSION="0.4.1"
+readonly VERSION="0.4.2"
 
 # Colores
 readonly RED='\033[0;31m'
@@ -175,9 +175,34 @@ if [ -z "$XML_FILE" ]; then
     exit 1
 fi
 
-# Eliminar DTD si está presente
-sed -i '/<!DOCTYPE.*kismet.*dtd">/d' "$XML_FILE"
+# Eliminar cualquier referencia a DTD para evitar errores de procesamiento
+sed -i '/<!\(DOCTYPE\|ENTITY\).*>/d' "$XML_FILE"
 
+# Asegurarnos que el archivo existe y es legible
+if [ ! -r "$XML_FILE" ]; then
+    echo -e "${RED}Error: No se puede leer el archivo $XML_FILE${NC}"
+    exit 1
+fi
+
+# Verificar que el archivo XML es válido
+if ! xmlstarlet val -w "$XML_FILE" > /dev/null 2>&1; then
+    echo -e "${YELLOW}Advertencia: El archivo XML podría no ser válido. Intentando repararlo...${NC}"
+    # Eliminamos líneas problemáticas y nos aseguramos de tener un XML bien formado
+    # Creamos un archivo temporal
+    TMP_XML="${TMP_DIR}/temp_fixed.xml"
+    
+    # Limpieza básica del XML
+    cat "$XML_FILE" | grep -v "DOCTYPE" | grep -v "ENTITY" > "$TMP_XML"
+    
+    # Reemplazamos el archivo original solo si el temporal existe y tiene contenido
+    if [ -s "$TMP_XML" ]; then
+        mv "$TMP_XML" "$XML_FILE"
+        chmod 644 "$XML_FILE"
+    else
+        echo -e "${RED}Error: No se pudo reparar el archivo XML.${NC}"
+        exit 1
+    fi
+fi
 
 
 # ========== REDES DETECTADAS ==========
@@ -189,21 +214,44 @@ echo -e "\n${WHITE}========== REDES DETECTADAS ==========\n${NC}"
 # Muestra los encabezados de la tabla para las redes detectadas
 printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "Red" "MAC (punto de acceso)" "Fabricante" "Intens." "Canal" "Encriptación"
 
-# Extrae información de redes tipo "infrastructure" desde el archivo XML generado por Kismet
-xmlstarlet sel --skip-dtd -t -m "//wireless-network[@type='infrastructure']" \
-  -v "SSID/essid" -o "|" \                          # Nombre de la red
-  -v "BSSID" -o "|" \                               # MAC del punto de acceso
-  -v "snr-info/last_signal_dbm" -o "|" \            # Intensidad de señal
-  -v "channel" -o "|" \                             # Canal
-  -v "SSID/encryption" -o "|" \                     # Tipo de encriptación
-  -v "manuf" -n "$XML_FILE" 2>/dev/null | while IFS='|' read -r essid bssid signal channel enc fabricante; do
-    # Si el nombre de la red está vacío, se muestra como "(oculta)"
-    [ -z "$essid" ] && essid="(oculta)"
-    # Si el fabricante no está disponible, se marca como "Unknown"
-    [ -z "$fabricante" ] && fabricante="Unknown"
-
-    # Muestra los datos formateados en una tabla
-    printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "$essid" "$bssid" "$fabricante" "$signal" "$channel" "$enc"
+# Extraer redes con grep en lugar de xmlstarlet si hay problemas
+grep -A5 "<wireless-network type=\"infrastructure\"" "$XML_FILE" | while read -r line; do
+    if echo "$line" | grep -q "<SSID>"; then
+        essid=$(grep -A2 "<SSID>" <<< "$line" | grep "<essid>" | sed -E 's/.*<essid>(.*)<\/essid>.*/\1/')
+        [ -z "$essid" ] && essid="(oculta)"
+    fi
+    
+    if echo "$line" | grep -q "<BSSID>"; then
+        bssid=$(echo "$line" | sed -E 's/.*<BSSID>(.*)<\/BSSID>.*/\1/')
+    fi
+    
+    if echo "$line" | grep -q "<last_signal_dbm>"; then
+        signal=$(echo "$line" | sed -E 's/.*<last_signal_dbm>(.*)<\/last_signal_dbm>.*/\1/')
+    fi
+    
+    if echo "$line" | grep -q "<channel>"; then
+        channel=$(echo "$line" | sed -E 's/.*<channel>(.*)<\/channel>.*/\1/')
+    fi
+    
+    if echo "$line" | grep -q "<encryption>"; then
+        enc=$(echo "$line" | sed -E 's/.*<encryption>(.*)<\/encryption>.*/\1/')
+    fi
+    
+    if echo "$line" | grep -q "<manuf>"; then
+        fabricante=$(echo "$line" | sed -E 's/.*<manuf>(.*)<\/manuf>.*/\1/')
+        [ -z "$fabricante" ] && fabricante="Unknown"
+        
+        # Imprimir la red una vez que tenemos todos los datos
+        printf "%-22s %-20s %-36s %-8s %-6s %-30s\n" "$essid" "$bssid" "$fabricante" "$signal" "$channel" "$enc"
+        
+        # Resetear variables para la próxima red
+        essid=""
+        bssid=""
+        signal=""
+        channel=""
+        enc=""
+        fabricante=""
+    fi
 done
 
 #========== CLIENTES DETECTADOS ==========
@@ -216,37 +264,54 @@ echo
 # Encabezados de la tabla para mostrar clientes conectados o presentes
 printf "%-17s %-11s %-36s %-11s %-17s %-20s\n" "MAC" "Conectividad" "Fabricante" "Intensidad" "Asociado a" "Red"
 
-# Extrae información de clientes desde el archivo XML
-xmlstarlet sel --skip-dtd -t -m "//wireless-network/wireless-client" \
-  -v "../BSSID" -o "|" \                           # MAC del AP asociado
-  -v "client-mac" -o "|" \                         # MAC del cliente
-  -v "@type" -o "|" \                              # Tipo de conectividad (from, to, etc.)
-  -v "snr-info/last_signal_dbm" -n "$XML_FILE" 2>/dev/null
- |
-while IFS='|' read -r bssid mac tipo intensidad; do
-    # Omite clientes con MAC vacía o no válida
-    [[ -z "$mac" || "$mac" == "00:00:00:00:00:00" ]] && continue
-
-    # Busca el fabricante en la base de datos local (oui.txt)
-    fabricante=$(grep -i "$(echo $mac | cut -d':' -f1-3)" "$OUI_PATH" 2>/dev/null | awk -F"\t" '{print $2}')
+# Extraer clientes con grep en lugar de xmlstarlet
+grep -A20 "<wireless-client" "$XML_FILE" | while read -r line; do
+    if echo "$line" | grep -q "<client-mac>"; then
+        mac=$(echo "$line" | sed -E 's/.*<client-mac>(.*)<\/client-mac>.*/\1/')
+        [[ -z "$mac" || "$mac" == "00:00:00:00:00:00" ]] && continue
+    fi
     
-    # Si no se encuentra en el archivo OUI, busca en el XML
-    [ -z "$fabricante" ] && fabricante=$(xmlstarlet sel --skip-dtd -t -m "//wireless-client[client-mac='$mac']" -v "client-manuf" "$XML_FILE")
+    if echo "$line" | grep -q "wireless-client type="; then
+        tipo=$(echo "$line" | sed -E 's/.*type="([^"]+)".*/\1/')
+    fi
     
-    # Si aún está vacío, se pone como "Unknown"
-    [ -z "$fabricante" ] && fabricante="Unknown"
-
-    # Obtiene el nombre de la red (ESSID) asociada al AP
-    essid=$(xmlstarlet sel --skip-dtd -t -m "//wireless-network[BSSID='$bssid']" -v "SSID/essid" "$XML_FILE")
-
-    # Define color según la intensidad de señal
-    COLOR_INT="${NC}"
-    [[ "$intensidad" -ge -50 ]] && COLOR_INT="${YELLOW}"
-    [[ "$intensidad" -lt -50 && "$intensidad" -gt -70 ]] && COLOR_INT="${YELLOW}"
-    [[ "$intensidad" -le -70 ]] && COLOR_INT="${RED}"
-
-    # Imprime la información del cliente formateada con colores
-    printf "%-17s %-11s %-36s ${COLOR_INT}%-11s${NC} %-17s %-20s\n" "$mac" "$tipo" "$fabricante" "$intensidad" "$bssid" "$essid"
+    if echo "$line" | grep -q "<last_signal_dbm>"; then
+        intensidad=$(echo "$line" | sed -E 's/.*<last_signal_dbm>(.*)<\/last_signal_dbm>.*/\1/')
+    fi
+    
+    if echo "$line" | grep -q "<client-manuf>"; then
+        fabricante=$(echo "$line" | sed -E 's/.*<client-manuf>(.*)<\/client-manuf>.*/\1/')
+        [ -z "$fabricante" ] && fabricante="Unknown"
+    fi
+    
+    # Buscar BSSID asociado y ESSID (esto es más complejo con grep, simplificamos)
+    if echo "$line" | grep -q "<BSSID>"; then
+        bssid=$(echo "$line" | sed -E 's/.*<BSSID>(.*)<\/BSSID>.*/\1/')
+        # Intentamos encontrar el ESSID asociado a este BSSID
+        essid=$(grep -A5 "<BSSID>$bssid</BSSID>" "$XML_FILE" | grep -m1 "<essid>" | sed -E 's/.*<essid>(.*)<\/essid>.*/\1/')
+        
+        # Si tenemos MAC y BSSID, imprimimos el cliente
+        if [[ ! -z "$mac" && ! -z "$bssid" ]]; then
+            # Define color según la intensidad de señal
+            COLOR_INT="${NC}"
+            if [[ "$intensidad" =~ ^-?[0-9]+$ ]]; then
+                [[ "$intensidad" -ge -50 ]] && COLOR_INT="${YELLOW}"
+                [[ "$intensidad" -lt -50 && "$intensidad" -gt -70 ]] && COLOR_INT="${YELLOW}"
+                [[ "$intensidad" -le -70 ]] && COLOR_INT="${RED}"
+            fi
+            
+            # Imprime la información del cliente formateada con colores
+            printf "%-17s %-11s %-36s ${COLOR_INT}%-11s${NC} %-17s %-20s\n" "$mac" "$tipo" "$fabricante" "$intensidad" "$bssid" "$essid"
+            
+            # Resetear variables para el próximo cliente
+            mac=""
+            tipo=""
+            intensidad=""
+            fabricante=""
+            bssid=""
+            essid=""
+        fi
+    fi
 done
 
 
